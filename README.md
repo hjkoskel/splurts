@@ -6,7 +6,7 @@ Library for packing up measurement in fixed length binary records.
 
 When measuring something with measurement system. For each metric there are
 - Range where measured metric is going to be or range where value is significant for specific application
-- Sensor + electronics have range and accuracy
+- Sensor + electronics have range and precision
 - ADC have number of bits (8/10/12/16/32 etc..). And input range  0v-2.5v etc..
 - Signal processing system have maybe input range where it is calibrated.
 
@@ -18,7 +18,7 @@ Compression algorithms help but it can cause overhead. Some message formats like
 
 One solution is to scale and pack measurement structs into bytes directly. Unfortunately golang does not provide bit size directive on struct
 
-This library provides way to pack these multiple float metrics into byte array and spend only bits that are needed (depending on range and accuracy). And also provide function for decoding those bytes back to float map. So scaling is defined in one place
+This library provides way to pack these multiple float metrics into byte array and spend only bits that are needed (depending on range and step size). And also provide function for decoding those bytes back to float map. So scaling is defined in one place
 
 When values are not clamped in signal processing code, this library can store float as NaN -Inf and +Inf codes when value is under or over range.
 This feature is sometimes very critical. For example if radiation logger says 3.6 röentgens/h it is it's upper limit. It is nice if log says +Inf than arbitary pre determined limit when actual value is over range. This library also allows NaN value storage on non clamped mode. NaN can be used for signaling that specific value is not available (sensor failure etc...).  Decoding binary have option to report NaN as value or omit it
