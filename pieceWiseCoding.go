@@ -54,7 +54,7 @@ func (p *PiecewiseCoding) Max() float64 {
 //IsInvalid Validity checkup.
 func (p *PiecewiseCoding) IsInvalid() error {
 	if len(p.Steps) == 0 {
-		return fmt.Errorf("No steps defined")
+		return fmt.Errorf("No steps defined at %v", p.Name)
 	}
 	for _, step := range p.Steps {
 		if (step.Size <= 0) || (step.Count <= 0) {
@@ -118,6 +118,48 @@ func (p *PiecewiseCoding) BitCode(f float64) string {
 	formatstring := "%0" + fmt.Sprintf("%v", p.NumberOfBits()) + "b"
 	return fmt.Sprintf(formatstring, p.ScaleToUint(f))
 }
+
+//HexCode to hex code,
+func (p *PiecewiseCoding) HexCode(f float64) string {
+	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
+	//Even number
+	if numberOfHexChars%2 != 0 {
+		numberOfHexChars++
+	}
+
+	formatstring := "%0" + fmt.Sprintf("%v", numberOfHexChars) + "X"
+	return fmt.Sprintf(formatstring, p.ScaleToUint(f))
+}
+
+func (p *PiecewiseCoding) HexCodeMax() string {
+	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
+	//Even number
+	if numberOfHexChars%2 != 0 {
+		numberOfHexChars++
+	}
+	result := ""
+	for i := 0; i < numberOfHexChars; i++ {
+		result += "X"
+	}
+	return result
+}
+
+/* TODO TRASH!!!
+func (p *PiecewiseCoding) HexNybbleCode(f float64) string {
+	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
+	formatstring := "%0" + fmt.Sprintf("%v", numberOfHexChars) + "X"
+	return fmt.Sprintf(formatstring, p.ScaleToUint(f))
+}
+
+func (p *PiecewiseCoding) HexNybbleCodeMax() string {
+	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
+	result := ""
+	for i := 0; i < numberOfHexChars; i++ {
+		result += "X"
+	}
+	return result
+}
+*/
 
 //ScaleToFloat scales unsigned integer presentation to actual measurement float
 func (p *PiecewiseCoding) ScaleToFloat(v uint64) float64 {

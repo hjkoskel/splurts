@@ -31,6 +31,25 @@ func (p *PiecewiseFloats) NumberOfBits() int {
 	return result
 }
 
+//Decodes hex string 4bit or 8bit
+func (p *PiecewiseFloats) DecodeHex(hexString string, allowNaN bool) (map[string]float64, error) {
+	s := hexString
+	if len(s)%2 != 0 {
+		s = s + "0"
+	}
+
+	binarr := []byte{}
+	for n := 0; n*2 < len(s); n++ {
+		piece := s[n*2 : n*2+2]
+		v, parseErr := strconv.ParseInt(piece, 16, 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("Invalid hex string")
+		}
+		binarr = append(binarr, byte(v))
+	}
+	return p.Decode(binarr, allowNaN)
+}
+
 //Decode codes byte array to float value map.   If values are missing and allowNaN is true. Skip or replace with NaN on map
 func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float64, error) {
 	if int(math.Ceil(float64(p.NumberOfBits())/8.0)) != len(binarr) {
@@ -79,21 +98,56 @@ func (p *PiecewiseFloats) IsInvalid() error {
 	return nil
 }
 
-//Encode map of float values to byte struct. Low level function. Call Splurts
-func (p *PiecewiseFloats) Encode(values map[string]float64) ([]byte, error) {
+func (p *PiecewiseFloats) EncodeToBitString(values map[string]float64) string {
 	bitString := ""
 	for _, a := range *p {
 		f, haz := values[a.Name]
 		if haz {
-			code := a.BitCode(f)
-			bitString += code
+			bitString += a.BitCode(f)
 		} else {
-			maxCodeBin := fmt.Sprintf("%b", a.MaxCode())
-			bitString += maxCodeBin //All bits up
+			bitString += fmt.Sprintf("%b", a.MaxCode())
 		}
 	}
-	neededPad := 8 - (len(bitString) % 8)
+	return bitString
+}
+
+//pad to 4bit
+func (p *PiecewiseFloats) EncodeToHexNybble(values map[string]float64) (string, error) {
+	bitString := p.EncodeToBitString(values)
+	neededPad := 4 - (len(bitString) % 4)
 	if 0 < neededPad {
+		padformat := "%0" + fmt.Sprintf("%v", neededPad) + "b"
+		bitString = bitString + fmt.Sprintf(padformat, 0)
+	}
+
+	length := len(bitString)
+	result := ""
+	for n := 0; n*4 < length; n++ {
+		piece := bitString[n*4 : n*4+4]
+		v, parseErr := strconv.ParseInt(piece, 2, 64)
+		if parseErr != nil {
+			return result, fmt.Errorf("Code internal failure %v", parseErr) //can not happen
+		}
+		result += fmt.Sprintf("%X", v)
+	}
+	return result, nil
+}
+
+//pad so it will fit to 8bit
+func (p *PiecewiseFloats) EncodeToHex(values map[string]float64) (string, error) {
+	result, err := p.EncodeToHexNybble(values)
+	if len(result)%2 != 0 {
+		result += "0"
+	}
+	return result, err
+}
+
+//Encode map of float values to byte struct. Low level function. Call Splurts
+func (p *PiecewiseFloats) Encode(values map[string]float64) ([]byte, error) {
+	bitString := p.EncodeToBitString(values)
+
+	neededPad := 8 - (len(bitString) % 8)
+	if (0 != neededPad) && (8 != neededPad) {
 		padformat := "%0" + fmt.Sprintf("%v", neededPad) + "b"
 		bitString = bitString + fmt.Sprintf(padformat, 0)
 	}

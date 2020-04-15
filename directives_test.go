@@ -148,6 +148,18 @@ type Fail8 struct {
 	V float64 `splurts:"min=-100,steps=5.0 10|a b|1.5 10"`
 }
 
+type Fail9 struct {
+	V float64 `splurts:"bits=65,min=-40.3,max=33.6"`
+}
+
+type Fail10 struct {
+	V float32 `splurts:"bits=33,min=-40.3,max=33.6"`
+}
+
+type Fail11 struct {
+	V int16 `splurts:"bits=17,min=-40.3,max=33.6"`
+}
+
 func TestFails(t *testing.T) {
 	_, e := GetPiecewisesFromStruct(Fail0{})
 	if e == nil {
@@ -192,6 +204,22 @@ func TestFails(t *testing.T) {
 	if e == nil {
 		t.Error("Fail 8 not failed")
 	}
+
+	_, e = GetPiecewisesFromStruct(Fail9{})
+	if e == nil {
+		t.Error("Fail 9 not failed")
+	}
+
+	_, e = GetPiecewisesFromStruct(Fail10{})
+	if e == nil {
+		t.Error("Fail 10 not failed")
+	}
+
+	_, e = GetPiecewisesFromStruct(Fail11{})
+	if e == nil {
+		t.Error("Fail 11 not failed")
+	}
+
 }
 
 //More complete case
@@ -211,6 +239,8 @@ type AllCases struct {
 	Lima     uint32  `splurts:"max=150,clamped"`
 	Mike     float64 `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
 	November int     `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
+	Oscar    float64 `splurts:"bits=12,min=-45.5,max=40"`
+	Papa     float64 `splurts:"bits=12,min=-45.5,max=40,clamped"`
 }
 
 func TestCompleteCase(t *testing.T) {
@@ -238,6 +268,8 @@ func TestCompleteCase(t *testing.T) {
 		Lima:     42,
 		Mike:     -21.5,
 		November: -90,
+		Oscar:    42.69,
+		Papa:     112.5,
 	}
 
 	byt, errSplurt := recipe.Splurts(d)

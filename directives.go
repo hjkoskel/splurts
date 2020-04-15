@@ -16,6 +16,7 @@ const (
 	DIRECTIVEMAX     = "max"
 	DIRECTIVESTEP    = "step"
 	DIRECTIVESTEPS   = "steps"
+	DIRECTIVEBITS    = "bits" //Use instead of step or steps
 )
 
 //Returns if there is problem in coding
@@ -30,6 +31,8 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 	parValues := make(map[string]float64)
 
 	directSteps := []PiecewiseCodingStep{}
+
+	bitsUsed := 0
 
 	for _, tok := range maintokens {
 		eqsplit := strings.Split(tok, "=")
@@ -50,9 +53,43 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 			case DIRECTIVEMIN, DIRECTIVEMAX, DIRECTIVESTEP:
 				f, ferr := strconv.ParseFloat(eqsplit[1], 64)
 				if ferr != nil {
-					return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v", name, tag, tok)
+					return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v parse error %v", name, tag, tok, ferr.Error())
 				}
 				parValues[eqsplit[0]] = f
+			case DIRECTIVEBITS:
+				bts, parseError := strconv.ParseInt(eqsplit[1], 10, 8)
+				if parseError != nil {
+					return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v", name, tag, tok)
+				}
+				bitsUsed = int(bts)
+				//Invalidity check
+				if bitsUsed < 0 {
+					return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, negative bits used", name, tag, tok)
+				}
+
+				switch typename {
+				case "float64", "int64", "uint64", "uint", "int":
+					if 64 < bitsUsed {
+						return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, too many bits max is 64", name, tag, tok)
+					}
+				case "float32", "int32", "uint32":
+					if 32 < bitsUsed {
+						return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, too many bits max is 32", name, tag, tok)
+					}
+				case "int16", "uint16":
+					if 16 < bitsUsed {
+						return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, too many bits max is 16", name, tag, tok)
+					}
+				case "int8", "uint8":
+					if 8 < bitsUsed {
+						return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, too many bits max is 8", name, tag, tok)
+					}
+				case "bool":
+					if 8 < bitsUsed {
+						return result, fmt.Errorf("invalid tag on %v tag %v, invalid token %v, too many bits max is 1", name, tag, tok)
+					}
+				}
+
 			case DIRECTIVESTEPS:
 				sSteps := strings.Split(eqsplit[1], "|")
 				for nStep, sStep := range sSteps {
@@ -76,14 +113,25 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 	dirMax, hazMax := parValues[DIRECTIVEMAX]
 	dirStep, hazStep := parValues[DIRECTIVESTEP]
 
+	if 0 < bitsUsed {
+		if !result.Clamped {
+			//is already clamped
+			dirStep = (dirMax - dirMin) / math.Pow(2, float64(bitsUsed))
+		} else {
+			//NaN, -inf and +inf are needed
+			dirStep = (dirMax - dirMin) / (math.Pow(2, float64(bitsUsed)) - 3)
+		}
+	}
+
 	result.Steps = directSteps
 	result.Min = dirMin
 
 	switch typename {
-	case "float64", "float32": //required min, max and step
-		if hazMin && hazMax && hazStep {
+	case "float64", "float32": //required min, max and step or bits
+		if hazMin && hazMax && (hazStep || 0 < bitsUsed) {
 			//Basic config
 			result.Steps = []PiecewiseCodingStep{PiecewiseCodingStep{Size: dirStep, Count: uint64(math.Ceil((dirMax - dirMin) / dirStep))}}
+
 		} else {
 			if len(result.Steps) == 0 || !hazMin {
 				return result, fmt.Errorf("float type requires \"min\", \"max\", and \"step\" OR \"min\" and \"steps\" directives at %v", name)
@@ -208,4 +256,12 @@ func (p *PiecewiseFloats) UnSplurts(raw []byte, output interface{}) error {
 //Splurts data to bytes  Get piecewiseFloatStruct by calling GetPiecewisesFromStruct
 func (p *PiecewiseFloats) Splurts(input interface{}) ([]byte, error) {
 	return p.Encode(getValuesToFloatMap(input))
+}
+
+func (p *PiecewiseFloats) SplurtsHex(input interface{}) (string, error) {
+	return p.EncodeToHex(getValuesToFloatMap(input))
+}
+
+func (p *PiecewiseFloats) SplurtsHexNybble(input interface{}) (string, error) {
+	return p.EncodeToHexNybble(getValuesToFloatMap(input))
 }
