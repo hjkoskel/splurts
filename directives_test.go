@@ -17,6 +17,7 @@ type ParticleMeas struct {
 	Pressure    float64 `splurts:"step=100,min=85000,max=110000"`
 	Small       float64 `splurts:"step=0.1,min=0,max=300"`
 	Large       float64 `splurts:"step=0.1,min=0,max=300"`
+	Extra    float64 `splurts:"step=0.1,min=0,bits=14"`
 	Heater      bool    //Flag for heater enabled
 }
 
@@ -31,7 +32,9 @@ func TestInfCase(t *testing.T) {
 		Humidity:    110,
 		Pressure:    80000,
 		Small:       301,
-		Large:       -0.001}
+		Large:       -0.001,
+		Extra:2.1,
+	}
 
 	byt, errSplurt := recipe.Splurts(d)
 	if errSplurt != nil {
@@ -149,16 +152,9 @@ type Fail8 struct {
 }
 
 type Fail9 struct {
-	V float64 `splurts:"bits=65,min=-40.3,max=33.6"`
+	V float64 `splurts:"step=0.1,min=-40,max=999999999999999999999999999999999"`
 }
 
-type Fail10 struct {
-	V float32 `splurts:"bits=33,min=-40.3,max=33.6"`
-}
-
-type Fail11 struct {
-	V int16 `splurts:"bits=17,min=-40.3,max=33.6"`
-}
 
 func TestFails(t *testing.T) {
 	_, e := GetPiecewisesFromStruct(Fail0{})
@@ -205,21 +201,6 @@ func TestFails(t *testing.T) {
 		t.Error("Fail 8 not failed")
 	}
 
-	_, e = GetPiecewisesFromStruct(Fail9{})
-	if e == nil {
-		t.Error("Fail 9 not failed")
-	}
-
-	_, e = GetPiecewisesFromStruct(Fail10{})
-	if e == nil {
-		t.Error("Fail 10 not failed")
-	}
-
-	_, e = GetPiecewisesFromStruct(Fail11{})
-	if e == nil {
-		t.Error("Fail 11 not failed")
-	}
-
 }
 
 //More complete case
@@ -241,7 +222,106 @@ type AllCases struct {
 	November int     `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
 	Oscar    float64 `splurts:"bits=12,min=-45.5,max=40"`
 	Papa     float64 `splurts:"bits=12,min=-45.5,max=40,clamped"`
+	Quebeck     float64 `splurts:"bits=12,min=-45.5,step=0.3,bits=12,clamped"`
 }
+
+func Test7bitCompleteCase(t *testing.T) {
+	recipe, errRecipe := GetPiecewisesFromStruct(AllCases{})
+	if errRecipe != nil {
+		t.Errorf("Recipe error %v", errRecipe)
+	}
+
+	t.Logf("\nCOMPLETE RECIPE IS \n%v\n\n", recipe)
+
+	//In range
+	d := AllCases{
+		Alpha:   2.3,
+		Bravo:   10.1,
+		Charlie: 42,
+		Delta:   123,
+		Echo:    true,
+		Foxtrot: 13.5,
+		Golf:    5,
+		Hotel:   26.4,
+
+		India:    20.4,
+		Juliet:   1.1,
+		Kilo:     25,
+		Lima:     42,
+		Mike:     -21.5,
+		November: -90,
+		Oscar:    42.69,
+		Papa:     112.5,
+	}
+
+	byt, errSplurt := recipe.Splurts7bitBytes(d)
+	if errSplurt != nil {
+		t.Errorf(errSplurt.Error())
+	} else {
+		t.Logf("SPLURTS %#v (len=%v)\n", byt, len(byt))
+		newD := AllCases{}
+		e := recipe.UnSplurts7bitBytes(byt, &newD)
+		if e != nil {
+			t.Errorf("Unsplurt err %v", e.Error())
+		} else {
+			t.Logf("NewD=%#v\n\n", newD)
+			if 0.00001 < math.Abs(newD.Alpha-d.Alpha) {
+				t.Errorf("Invalid")
+			}
+			if 0.00001 < math.Abs(float64(newD.Bravo-d.Bravo)) {
+				t.Errorf("Invalid")
+			}
+			if 0.00001 < math.Abs(float64(newD.Charlie-d.Charlie)) {
+				t.Errorf("Invalid")
+			}
+			if 0.00001 < math.Abs(float64(newD.Delta-d.Delta)) {
+				t.Errorf("Invalid")
+			}
+			if newD.Echo != d.Echo {
+				t.Errorf("Invalid")
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Foxtrot-d.Foxtrot)) {
+				t.Errorf("Invalid Foxtrot %v vs %v", newD.Foxtrot, d.Foxtrot)
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Golf-d.Golf)) {
+				t.Errorf("Invalid Golf %v vs %v", newD.Golf, d.Golf)
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Hotel-d.Hotel)) {
+				t.Errorf("Invalid %v vs %v", newD.Hotel, d.Hotel)
+			}
+
+			if 0.00001 < math.Abs(float64(newD.India-d.India)) {
+				t.Errorf("Invalid")
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Juliet-d.Juliet)) {
+				t.Errorf("Invalid")
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Kilo-d.Kilo)) {
+				t.Errorf("Invalid")
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Lima-d.Lima)) {
+				t.Errorf("Invalid")
+			}
+
+			if 0.00001 < math.Abs(float64(newD.Mike-d.Mike)) {
+				t.Errorf("Invalid Mike %v vs %v", newD.Mike, d.Mike)
+			}
+
+			if 0.00001 < math.Abs(float64(newD.November-d.November)) {
+				t.Errorf("Invalid November %v vs %v", newD.November, d.November)
+			}
+
+		}
+	}
+
+}
+
 
 func TestCompleteCase(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(AllCases{})
@@ -338,4 +418,36 @@ func TestCompleteCase(t *testing.T) {
 		}
 	}
 
+}
+
+//Testing 7bit packing
+
+type SevenBitADC struct {
+	AdcVoltage float64 `splurts:"min=-0.320,max=0.320,bits=16,clamped"`
+	MessageCounter      byte    `splurts:"min=0,bits=2,clamped"`
+}
+
+
+func TestSevenBitADC(t *testing.T) {
+	a:=SevenBitADC{AdcVoltage:-0.32,MessageCounter:1}
+
+	recipe, errRecipe := GetPiecewisesFromStruct(SevenBitADC{})
+	if errRecipe != nil {
+		t.Errorf("Recipe error %v", errRecipe)
+	}
+
+
+	bitArr,toBitArrErr:=recipe.Splurts7bitBytes(a)
+	if toBitArrErr!=nil{
+		t.Errorf("Splurt error %v",toBitArrErr.Error())
+	}
+
+	b:=SevenBitADC{}
+	errUnsplurt:=recipe.UnSplurts7bitBytes(bitArr, &b)
+	if errUnsplurt!=nil{
+		t.Errorf("Unsplurt error %v",errUnsplurt.Error())
+	}
+	if a.MessageCounter!=b.MessageCounter{
+		t.Errorf("Seven bit err %#v vs %#v,  (arr=%#v)",a,b,bitArr)
+	}
 }

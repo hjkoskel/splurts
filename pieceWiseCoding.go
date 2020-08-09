@@ -16,6 +16,7 @@ type PiecewiseCoding struct {
 	Min     float64
 	Steps   []PiecewiseCodingStep
 	Clamped bool //No  NaN  -Inf +Inf, just raw value.. Used for flags etc...
+	//TODO LittleEndianize bool //Little endianize bytes if possible Splurts is usually using non byte multiple fields
 }
 
 func (p PiecewiseCoding) String() string {
@@ -56,9 +57,9 @@ func (p *PiecewiseCoding) IsInvalid() error {
 	if len(p.Steps) == 0 {
 		return fmt.Errorf("No steps defined at %v", p.Name)
 	}
-	for _, step := range p.Steps {
+	for i, step := range p.Steps {
 		if (step.Size <= 0) || (step.Count <= 0) {
-			return fmt.Errorf("invalid step %#v", step)
+			return fmt.Errorf("invalid step %#v at index %v", step,i)
 		}
 	}
 	return nil

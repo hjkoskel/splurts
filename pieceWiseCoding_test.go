@@ -30,6 +30,17 @@ func TestValid(t *testing.T) {
 
 }
 
+/*func TestEndian(t *testing.T) {
+	dut := PiecewiseCoding{
+		Min: 0,
+		Steps: []PiecewiseCodingStep{
+			PiecewiseCodingStep{Count: 65536, Size: 1},
+		},
+		Clamped: false,
+	}
+
+}*/
+
 func TestMax(t *testing.T) {
 	//minimum is direct value
 	dut := PiecewiseCoding{

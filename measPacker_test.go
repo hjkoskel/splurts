@@ -62,6 +62,10 @@ func TestExample(t *testing.T) {
 		t.Errorf("Encoding error %v\n", err.Error())
 	}
 
+	if len(data) != 4 {
+		t.Errorf("data length error %v", len(data))
+	}
+
 	parsed, parseErr := structure.Decode(data, true)
 	if parseErr != nil {
 		t.Errorf("Decode error %v", parseErr)
