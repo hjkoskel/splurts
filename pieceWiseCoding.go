@@ -16,7 +16,7 @@ type PiecewiseCoding struct {
 	Min     float64
 	Steps   []PiecewiseCodingStep
 	Clamped bool //No  NaN  -Inf +Inf, just raw value.. Used for flags etc...
-	//TODO LittleEndianize bool //Little endianize bytes if possible Splurts is usually using non byte multiple fields
+	Enums   []string
 }
 
 func (p PiecewiseCoding) String() string {
@@ -54,12 +54,22 @@ func (p *PiecewiseCoding) Max() float64 {
 
 //IsInvalid Validity checkup.
 func (p *PiecewiseCoding) IsInvalid() error {
-	if len(p.Steps) == 0 {
-		return fmt.Errorf("No steps defined at %v", p.Name)
+	if len(p.Name) == 0 {
+		return fmt.Errorf("name missing")
 	}
+	if 0 < len(p.Enums) {
+		if !p.Clamped {
+			return fmt.Errorf("internal error enums must be clamped not automatic +inf -inf")
+		}
+		return nil
+	}
+	if len(p.Steps) == 0 {
+		return fmt.Errorf("no steps defined at %v", p.Name)
+	}
+
 	for i, step := range p.Steps {
 		if (step.Size <= 0) || (step.Count <= 0) {
-			return fmt.Errorf("invalid step %#v at index %v", step,i)
+			return fmt.Errorf("invalid step %#v at index %v", step, i)
 		}
 	}
 	return nil
@@ -67,6 +77,9 @@ func (p *PiecewiseCoding) IsInvalid() error {
 
 //TotalStepCount helper function
 func (p *PiecewiseCoding) TotalStepCount() uint64 {
+	if 0 < len(p.Enums) {
+		return uint64(len(p.Enums)) + 1
+	}
 	n := uint64(0)
 	for _, st := range p.Steps {
 		n += st.Count
@@ -76,6 +89,9 @@ func (p *PiecewiseCoding) TotalStepCount() uint64 {
 
 //NumberOfBits how many bits are spent
 func (p *PiecewiseCoding) NumberOfBits() int {
+	if 0 < len(p.Enums) {
+		return int(math.Ceil(math.Log2(float64(len(p.Enums) + 1))))
+	}
 	n := p.TotalStepCount()
 	if p.Clamped {
 		return int(math.Ceil(math.Log2(float64(n))))
@@ -91,6 +107,11 @@ func (p *PiecewiseCoding) MaxCode() uint64 {
 
 //ScaleToUint converts float to step number.
 func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
+
+	if 0 < len(p.Enums) {
+		return uint64(f)
+	}
+
 	if math.IsNaN(f) {
 		return p.MaxCode()
 	}
@@ -99,6 +120,7 @@ func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
 	}
 	total := p.Min
 	stepcounter := uint64(0)
+	maxcode := p.MaxCode()
 	for _, step := range p.Steps {
 		a := total
 		total += float64(step.Count) * step.Size
@@ -107,17 +129,24 @@ func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
 			if !p.Clamped {
 				result++
 			}
+			if maxcode < result {
+				return maxcode
+			}
 			return result
 		}
 		stepcounter += uint64(step.Count)
 	}
-	return p.MaxCode() - 1
+	return maxcode - 1
 }
 
 //BitCode is just wrapper for producing bit string representation from code
-func (p *PiecewiseCoding) BitCode(f float64) string {
+func (p *PiecewiseCoding) BitCode(f float64) (string, error) {
 	formatstring := "%0" + fmt.Sprintf("%v", p.NumberOfBits()) + "b"
-	return fmt.Sprintf(formatstring, p.ScaleToUint(f))
+	result := fmt.Sprintf(formatstring, p.ScaleToUint(f))
+	if len(result) != p.NumberOfBits() {
+		return "", fmt.Errorf("bit length %v does not match number of bits %v  (f=%v  piecewise=%#v actual maxCode=%v)\n", len(result), p.NumberOfBits(), f, p, p.MaxCode())
+	}
+	return result, nil
 }
 
 //HexCode to hex code,
@@ -144,23 +173,6 @@ func (p *PiecewiseCoding) HexCodeMax() string {
 	}
 	return result
 }
-
-/* TODO TRASH!!!
-func (p *PiecewiseCoding) HexNybbleCode(f float64) string {
-	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
-	formatstring := "%0" + fmt.Sprintf("%v", numberOfHexChars) + "X"
-	return fmt.Sprintf(formatstring, p.ScaleToUint(f))
-}
-
-func (p *PiecewiseCoding) HexNybbleCodeMax() string {
-	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
-	result := ""
-	for i := 0; i < numberOfHexChars; i++ {
-		result += "X"
-	}
-	return result
-}
-*/
 
 //ScaleToFloat scales unsigned integer presentation to actual measurement float
 func (p *PiecewiseCoding) ScaleToFloat(v uint64) float64 {

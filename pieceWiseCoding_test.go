@@ -7,7 +7,7 @@ import (
 
 func TestValid(t *testing.T) {
 	dut := PiecewiseCoding{
-		Name:    "", //Needed only for floatStruct
+		Name:    "a", //Needed only for floatStruct
 		Min:     12.3,
 		Steps:   []PiecewiseCodingStep{},
 		Clamped: false,
@@ -27,8 +27,34 @@ func TestValid(t *testing.T) {
 	if dut.IsInvalid() != nil {
 		t.Error("Is invalid even it should not")
 	}
+}
+
+func TestEnums(t *testing.T) {
+	dut := PiecewiseCoding{
+		Name:  "b",
+		Enums: []string{"ONE", "two", "three", "FOUR"},
+	}
+
+	if dut.NumberOfBits() != 3 {
+		t.Error("invalid number of bits")
+	}
+	if dut.TotalStepCount() != 5 {
+		t.Error("invalid step count")
+	}
+	code, codeErr := dut.BitCode(2)
+	if codeErr != nil {
+		t.Error(codeErr)
+	}
+	if code != "010" {
+		t.Error("bitcode failed")
+	}
+}
+
+/*
+func TestValid(t *testing.T) {
 
 }
+*/
 
 /*func TestEndian(t *testing.T) {
 	dut := PiecewiseCoding{
@@ -185,8 +211,9 @@ func TestCode(t *testing.T) {
 		Clamped: false, //False= non clampled so is that -Inf +Inf are included.
 	}
 
-	if dut.BitCode(11.2) != "1110" {
-		t.Errorf("End coding error")
+	code, codeErr := dut.BitCode(11.2)
+	if code != "1110" || codeErr != nil {
+		t.Errorf("End coding error %v", codeErr)
 	}
 	if dut.ScaleToFloat(dut.ScaleToUint(11.2)) != math.Inf(1) {
 		t.Errorf("Inf err")
@@ -204,8 +231,9 @@ func TestCode(t *testing.T) {
 		t.Errorf("Nan err")
 	}
 
-	if dut.BitCode(5.5) != "0000" {
-		t.Errorf("End coding error")
+	code, codeErr = dut.BitCode(5.5)
+	if code != "0000" || codeErr != nil {
+		t.Errorf("End coding error %v", codeErr)
 	}
 
 	//1 bit test
@@ -216,13 +244,20 @@ func TestCode(t *testing.T) {
 			PiecewiseCodingStep{Size: 1, Count: 2},
 		},
 	}
-	t.Logf("1bit is %v  bits=%v totalSTeps=%v\n", dut1.NumberOfBits(), dut1.BitCode(1), dut1.TotalStepCount())
+
+	code, codeErr = dut1.BitCode(1)
+	if codeErr != nil {
+		t.Errorf("End coding error %v", codeErr)
+	}
+
+	t.Logf("1bit is %v  bits=%v totalSTeps=%v\n", dut1.NumberOfBits(), code, dut1.TotalStepCount())
 
 	if dut1.NumberOfBits() != 1 {
 		t.Errorf("one bit is not one bit")
 	}
 
-	if len(dut1.BitCode(1)) != 1 {
+	code, _ = dut1.BitCode(1)
+	if len(code) != 1 {
 		t.Errorf("one bit bit is not one in length")
 	}
 
@@ -236,7 +271,8 @@ func TestCode(t *testing.T) {
 	}
 
 	//Clamped mode. Means that values are already clamped
-	if len(dut2.BitCode(2)) != 2 {
+	code, _ = dut2.BitCode(2)
+	if len(code) != 2 {
 		t.Errorf("one bit bit is not one in length")
 	}
 

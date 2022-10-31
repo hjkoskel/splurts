@@ -12,13 +12,15 @@ import (
 )
 
 type ParticleMeas struct {
-	Temperature float64 `splurts:"step=0.1,min=-40,max=40"`
-	Humidity    float64 `splurts:"step=0.05,min=0,max=100"`
-	Pressure    float64 `splurts:"step=100,min=85000,max=110000"`
-	Small       float64 `splurts:"step=0.1,min=0,max=300"`
-	Large       float64 `splurts:"step=0.1,min=0,max=300"`
-	Extra    float64 `splurts:"step=0.1,min=0,bits=14"`
-	Heater      bool    //Flag for heater enabled
+	SystemStatus string  `splurts:"enum=UNDEFINED,INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
+	Temperature  float64 `splurts:"step=0.1,min=-40,max=40"`
+	Humidity     float64 `splurts:"step=0.05,min=0,max=100"`
+	Pressure     float64 `splurts:"step=100,min=85000,max=110000"`
+	Small        float64 `splurts:"step=0.1,min=0,max=300"`
+	Large        float64 `splurts:"step=0.1,min=0,max=300"`
+	Extra        float64 `splurts:"step=0.1,min=0,bits=14"`
+	Heater       bool    //Flag for heater enabled
+	Emptyvalue   string  `splurts:"enum=NO,MAYBE,YES"`
 }
 
 func TestInfCase(t *testing.T) {
@@ -28,12 +30,13 @@ func TestInfCase(t *testing.T) {
 	}
 
 	d := ParticleMeas{
-		Temperature: -40.5,
-		Humidity:    110,
-		Pressure:    80000,
-		Small:       301,
-		Large:       -0.001,
-		Extra:2.1,
+		SystemStatus: "MEASURE",
+		Temperature:  -40.5,
+		Humidity:     110,
+		Pressure:     80000,
+		Small:        301,
+		Large:        -0.001,
+		Extra:        2.1,
 	}
 
 	byt, errSplurt := recipe.Splurts(d)
@@ -75,9 +78,7 @@ func TestEasyUseCase(t *testing.T) {
 		t.Errorf("Recipe error %v", errRecipe)
 	}
 
-	t.Logf("Easy case\n%v", recipe)
-
-	d := ParticleMeas{Temperature: 18.3, Humidity: 23.6, Pressure: 102400, Small: 23.2, Large: 41}
+	d := ParticleMeas{SystemStatus: "IDLE", Temperature: 18.3, Humidity: 23.6, Pressure: 102400, Small: 23.2, Large: 41}
 	byt, errSplurt := recipe.Splurts(d)
 	if errSplurt != nil {
 		t.Errorf(errSplurt.Error())
@@ -89,6 +90,10 @@ func TestEasyUseCase(t *testing.T) {
 			t.Errorf("Unsplurt err %v", e.Error())
 		} else {
 			t.Logf("NewD=%#v\n\n", newD)
+
+			if newD.SystemStatus != d.SystemStatus {
+				t.Errorf("invalid system status %s vs %s", newD.SystemStatus, d.SystemStatus)
+			}
 
 			if 0.00001 < math.Abs(float64(newD.Temperature-d.Temperature)) {
 				t.Errorf("Invalid Temperature")
@@ -154,7 +159,6 @@ type Fail8 struct {
 type Fail9 struct {
 	V float64 `splurts:"step=0.1,min=-40,max=999999999999999999999999999999999"`
 }
-
 
 func TestFails(t *testing.T) {
 	_, e := GetPiecewisesFromStruct(Fail0{})
@@ -222,7 +226,7 @@ type AllCases struct {
 	November int     `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
 	Oscar    float64 `splurts:"bits=12,min=-45.5,max=40"`
 	Papa     float64 `splurts:"bits=12,min=-45.5,max=40,clamped"`
-	Quebeck     float64 `splurts:"bits=12,min=-45.5,step=0.3,bits=12,clamped"`
+	Quebeck  float64 `splurts:"bits=12,min=-45.5,step=0.3,bits=12,clamped"`
 }
 
 func Test7bitCompleteCase(t *testing.T) {
@@ -321,7 +325,6 @@ func Test7bitCompleteCase(t *testing.T) {
 	}
 
 }
-
 
 func TestCompleteCase(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(AllCases{})
@@ -423,31 +426,59 @@ func TestCompleteCase(t *testing.T) {
 //Testing 7bit packing
 
 type SevenBitADC struct {
-	AdcVoltage float64 `splurts:"min=-0.320,max=0.320,bits=16,clamped"`
-	MessageCounter      byte    `splurts:"min=0,bits=2,clamped"`
+	AdcVoltage     float64 `splurts:"min=-0.320,max=0.320,bits=16,clamped"`
+	MessageCounter byte    `splurts:"min=0,bits=2,clamped"`
 }
 
-
 func TestSevenBitADC(t *testing.T) {
-	a:=SevenBitADC{AdcVoltage:-0.32,MessageCounter:1}
+	a := SevenBitADC{AdcVoltage: -0.32, MessageCounter: 1}
 
 	recipe, errRecipe := GetPiecewisesFromStruct(SevenBitADC{})
 	if errRecipe != nil {
 		t.Errorf("Recipe error %v", errRecipe)
 	}
 
-
-	bitArr,toBitArrErr:=recipe.Splurts7bitBytes(a)
-	if toBitArrErr!=nil{
-		t.Errorf("Splurt error %v",toBitArrErr.Error())
+	bitArr, toBitArrErr := recipe.Splurts7bitBytes(a)
+	if toBitArrErr != nil {
+		t.Errorf("Splurt error %v", toBitArrErr.Error())
 	}
 
-	b:=SevenBitADC{}
-	errUnsplurt:=recipe.UnSplurts7bitBytes(bitArr, &b)
-	if errUnsplurt!=nil{
-		t.Errorf("Unsplurt error %v",errUnsplurt.Error())
+	b := SevenBitADC{}
+	errUnsplurt := recipe.UnSplurts7bitBytes(bitArr, &b)
+	if errUnsplurt != nil {
+		t.Errorf("Unsplurt error %v", errUnsplurt.Error())
 	}
-	if a.MessageCounter!=b.MessageCounter{
-		t.Errorf("Seven bit err %#v vs %#v,  (arr=%#v)",a,b,bitArr)
+	if a.MessageCounter != b.MessageCounter {
+		t.Errorf("Seven bit err %#v vs %#v,  (arr=%#v)", a, b, bitArr)
 	}
+}
+
+type Simple7 struct {
+	A float64 `splurts:"min=0,step=0.01,bits=9,clamped"` //us
+	B float64 `splurts:"min=0,step=0.01,bits=9,clamped"`
+	C int     `splurts:"min=0,bits=8,clamped"`            //TODO BITS?
+	D float64 `splurts:"min=0,step=0.01,bits=16,clamped"` //us how long coil is running
+	E float64 `splurts:"min=-0.320,max=0.320,bits=16,clamped"`
+	F int     `splurts:"min=0,bits=5,clamped"`
+}
+
+func Test7bitSimpleCase(t *testing.T) {
+	a := Simple7{A: 5, B: 1.5, C: 5, D: 15, E: 0, F: 0}
+	recipe, errRecipe := GetPiecewisesFromStruct(Simple7{})
+	if errRecipe != nil {
+		t.Errorf("Recipe error %v", errRecipe)
+	}
+	bitArr, toBitArrErr := recipe.Splurts7bitBytes(a)
+	if toBitArrErr != nil {
+		t.Errorf("Splurt error %v", toBitArrErr.Error())
+	}
+
+	//t.Errorf("KOODATTU %#v", bitArr)
+
+	b := SevenBitADC{}
+	errUnsplurt := recipe.UnSplurts7bitBytes(bitArr, &b)
+	if errUnsplurt != nil {
+		t.Errorf("Unsplurt error %v", errUnsplurt.Error())
+	}
+
 }

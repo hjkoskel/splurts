@@ -5,19 +5,32 @@ Packs up float64 struct into binary blob. Does not obey byte boundaries but pads
 package splurts
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
-	"fmt"
 )
 
 //PiecewiseFloats describe order and how values on struct are scaled
 type PiecewiseFloats []PiecewiseCoding //Map does not provide fixed order must be array
 
+func (p *PiecewiseFloats) getCoding(name string) (PiecewiseCoding, error) {
+	for _, result := range *p {
+		if result.Name == name {
+			return result, nil
+		}
+	}
+	return PiecewiseCoding{}, fmt.Errorf("name %v not found", name)
+}
+
 func (p PiecewiseFloats) String() string {
 	result := ""
 	for i, a := range p {
-		result += fmt.Sprintf("%v: %v\n", i, a)
+		if 0 < len(a.Enums) {
+			result += fmt.Sprintf("%v: %v (enums:%#v)\n", i, a, a.Enums)
+		} else {
+			result += fmt.Sprintf("%v: %v\n", i, a)
+		}
 	}
 	return strings.TrimSpace(result)
 }
@@ -73,7 +86,14 @@ func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float
 
 		pieceval, errParse := strconv.ParseInt(piece, 2, 64)
 		if errParse != nil { //Non-unit testable
-			return result, fmt.Errorf("internal parse error can not happen err=%v  (piece=%v, bits=%v)", errParse,piece,a.NumberOfBits())
+			return result, fmt.Errorf("internal parse error can not happen err=%v  (piece=%v, bits=%v)", errParse, piece, a.NumberOfBits())
+		}
+
+		if 0 < len(a.Enums) {
+			if len(a.Enums) < int(pieceval) {
+				return result, fmt.Errorf("variable %s have value %v, but it have %v enums + empty", a.Name, pieceval, len(a.Enums))
+			}
+			result[a.Name] = float64(pieceval)
 		}
 
 		v := a.ScaleToFloat(uint64(pieceval))
@@ -84,33 +104,41 @@ func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float
 	return result, nil
 }
 
-
 //Formatted to 7bit
 type SevenBitArr []byte
 
 //Decode7bitBytes decode, skipping MSB from
 func (p *PiecewiseFloats) Decode7bitBytes(binarr SevenBitArr, allowNaN bool) (map[string]float64, error) {
+	if len(binarr) == 0 {
+		return nil, fmt.Errorf("No data")
+	}
 	//Naive solution, optimize later
 	var sb strings.Builder
 	//Remove zero bits from array
-	for i,b:=range(binarr){
-		if 127<b{
-			return nil,fmt.Errorf("Non 7-bit byte vector at index %v on %#X",i,binarr)
+	for i, b := range binarr {
+		if 127 < b {
+			return nil, fmt.Errorf("Non 7-bit byte vector at index %v on %#X", i, binarr)
 		}
-		sb.WriteString(fmt.Sprintf("%.7b",b))
-	}
-	//Trim to expected length and split
-	arr:=splitFixedSizePieces(sb.String()[:p.NumberOfBits()],8)
-	//Pad if needed.. add AFTER zeros
-	last:=len(arr)-1;
-	for(len(arr[last])<8){
-		arr[last]+="0"
+		sb.WriteString(fmt.Sprintf("%.7b", b))
 	}
 
-	result:=make([]byte,len(arr))
-	for i,v:=range(arr){
-		intv,_:=strconv.ParseInt(v, 2,16)
-		result[i]=byte(intv)
+	//Trim to expected length and split
+	s := sb.String()
+	bits := p.NumberOfBits()
+	if len(s) < bits {
+		return nil, fmt.Errorf("Not enough bits")
+	}
+	arr := splitFixedSizePieces(s[:bits], 8)
+	//Pad if needed.. add AFTER zeros
+	last := len(arr) - 1
+	for len(arr[last]) < 8 {
+		arr[last] += "0"
+	}
+
+	result := make([]byte, len(arr))
+	for i, v := range arr {
+		intv, _ := strconv.ParseInt(v, 2, 16)
+		result[i] = byte(intv)
 	}
 	return p.Decode(result, allowNaN)
 }
@@ -134,7 +162,8 @@ func (p *PiecewiseFloats) EncodeToBitString(values map[string]float64) string {
 	for _, a := range *p {
 		f, haz := values[a.Name]
 		if haz {
-			bitString += a.BitCode(f)
+			s, _ := a.BitCode(f)
+			bitString += s
 		} else {
 			bitString += fmt.Sprintf("%b", a.MaxCode())
 		}
@@ -173,13 +202,12 @@ func (p *PiecewiseFloats) EncodeToHex(values map[string]float64) (string, error)
 	return result, err
 }
 
-func bitStringToByteArr(bitString string) ([]byte,error){
+func bitStringToByteArr(bitString string) ([]byte, error) {
 	neededPad := 8 - (len(bitString) % 8)
 	if (0 != neededPad) && (8 != neededPad) {
 		padformat := "%0" + fmt.Sprintf("%v", neededPad) + "b"
 		bitString = bitString + fmt.Sprintf(padformat, 0)
 	}
-
 	length := len(bitString)
 	result := []byte{}
 
@@ -200,30 +228,28 @@ func (p *PiecewiseFloats) Encode(values map[string]float64) ([]byte, error) {
 	return bitStringToByteArr(p.EncodeToBitString(values))
 }
 
-func splitFixedSizePieces(s string,step int) []string{
-  arr:=make([]string,int(math.Ceil(float64(len(s))/float64(step))))
-  for i:=range(arr){
-    arr[i]=s[i*step:int(math.Min(float64(len(s)),float64((i+1)*step)))]
-  }
+func splitFixedSizePieces(s string, step int) []string {
+	arr := make([]string, int(math.Ceil(float64(len(s))/float64(step))))
+	for i := range arr {
+		arr[i] = s[i*step : int(math.Min(float64(len(s)), float64((i+1)*step)))]
+	}
 
-  return arr;
+	return arr
 }
-
-
 
 //Encode7bitBytes  used in FPGA projects when MSB bit reserved for data/command flag
 func (p *PiecewiseFloats) Encode7bitBytes(values map[string]float64) (SevenBitArr, error) {
-	s:=p.EncodeToBitString(values)
-	pieces:=splitFixedSizePieces(s,7)
-	if len(pieces)==0{
-		return nil,nil
+	s := p.EncodeToBitString(values)
+	pieces := splitFixedSizePieces(s, 7)
+	if len(pieces) == 0 {
+		return nil, nil
 	}
-	neededPad :=7-(len(pieces[len(pieces)-1]) % 7)
+	neededPad := 7 - (len(pieces[len(pieces)-1]) % 7)
 
-	if (neededPad!=0)&&(neededPad!=7) {
+	if (neededPad != 0) && (neededPad != 7) {
 		padformat := "%0" + fmt.Sprintf("%v", neededPad) + "b"
-		pieces[len(pieces)-1] =pieces[len(pieces)-1] + fmt.Sprintf(padformat, 0)
+		pieces[len(pieces)-1] = pieces[len(pieces)-1] + fmt.Sprintf(padformat, 0)
 	}
-	result:="0"+strings.Join(pieces,"0")
+	result := "0" + strings.Join(pieces, "0")
 	return bitStringToByteArr(result) //add one front zero per 7bit byte -> 8bit byte
 }
