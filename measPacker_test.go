@@ -132,7 +132,6 @@ func TestExample(t *testing.T) {
 	if structure.IsInvalid() == nil {
 		t.Errorf("missing name not checked")
 	}
-
 }
 
 func TestHex(t *testing.T) {

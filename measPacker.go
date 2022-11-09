@@ -233,7 +233,6 @@ func splitFixedSizePieces(s string, step int) []string {
 	for i := range arr {
 		arr[i] = s[i*step : int(math.Min(float64(len(s)), float64((i+1)*step)))]
 	}
-
 	return arr
 }
 

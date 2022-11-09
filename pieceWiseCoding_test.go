@@ -3,6 +3,8 @@ package splurts
 import (
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValid(t *testing.T) {
@@ -18,15 +20,9 @@ func TestValid(t *testing.T) {
 	}
 
 	dut.Steps = []PiecewiseCodingStep{PiecewiseCodingStep{Count: 20}}
-	if dut.IsInvalid() == nil {
-		t.Errorf("zero size test")
-	}
-
+	assert.NotEqual(t, nil, dut.IsInvalid())
 	dut.Steps = []PiecewiseCodingStep{PiecewiseCodingStep{Count: 20, Size: 0.15}}
-
-	if dut.IsInvalid() != nil {
-		t.Error("Is invalid even it should not")
-	}
+	assert.Equal(t, nil, dut.IsInvalid())
 }
 
 func TestEnums(t *testing.T) {
@@ -35,37 +31,20 @@ func TestEnums(t *testing.T) {
 		Enums: []string{"ONE", "two", "three", "FOUR"},
 	}
 
-	if dut.NumberOfBits() != 3 {
-		t.Error("invalid number of bits")
-	}
-	if dut.TotalStepCount() != 5 {
-		t.Error("invalid step count")
-	}
+	assert.Equal(t, 3, dut.NumberOfBits())
+	assert.Equal(t, uint64(5), dut.TotalStepCount())
+
 	code, codeErr := dut.BitCode(2)
-	if codeErr != nil {
-		t.Error(codeErr)
-	}
-	if code != "010" {
-		t.Error("bitcode failed")
-	}
+	assert.Equal(t, nil, codeErr)
+	assert.Equal(t, "010", code)
 }
 
-/*
-func TestValid(t *testing.T) {
-
+func TestDecimals(t *testing.T) {
+	dut := PiecewiseCoding{Steps: []PiecewiseCodingStep{PiecewiseCodingStep{Size: 0.0123}}}
+	assert.Equal(t, 2, dut.Decimals())
+	dut = PiecewiseCoding{Steps: []PiecewiseCodingStep{PiecewiseCodingStep{Size: 1.5}}}
+	assert.Equal(t, 0, dut.Decimals())
 }
-*/
-
-/*func TestEndian(t *testing.T) {
-	dut := PiecewiseCoding{
-		Min: 0,
-		Steps: []PiecewiseCodingStep{
-			PiecewiseCodingStep{Count: 65536, Size: 1},
-		},
-		Clamped: false,
-	}
-
-}*/
 
 func TestMax(t *testing.T) {
 	//minimum is direct value
@@ -79,12 +58,7 @@ func TestMax(t *testing.T) {
 		},
 		Clamped: false,
 	}
-
-	expectedvalue := 10 + 20*0.15 + 10*0.1 + 10*0.2
-	if dut.Max() != expectedvalue {
-		t.Errorf("Invalid Max")
-	}
-
+	assert.Equal(t, 10+20*0.15+10*0.1+10*0.2, dut.Max())
 }
 
 func TestNumberOfBits(t *testing.T) {
@@ -99,22 +73,14 @@ func TestNumberOfBits(t *testing.T) {
 		},
 		Clamped: false,
 	}
-	if dut.NumberOfBits() != 4 {
-		t.Errorf("Wrong number of bits on clamped=false %v", dut.NumberOfBits())
-	}
-	if dut.MaxCode() != 15 { //It is calculated from number of bits
-		t.Errorf("Invalid max code %v", dut.MaxCode())
-	}
+	assert.Equal(t, 4, dut.NumberOfBits())
+	assert.Equal(t, uint64(15), dut.MaxCode())
 
 	dut.Clamped = true
-	if dut.NumberOfBits() != 3 {
-		t.Errorf("Wrong number of bits on clamped=true %v", dut.NumberOfBits())
-	}
+	assert.Equal(t, 3, dut.NumberOfBits())
 
 	dut.Clamped = true
-	if dut.MaxCode() != 7 {
-		t.Errorf("Invalid max code %v", dut.MaxCode())
-	}
+	assert.Equal(t, uint64(7), dut.MaxCode())
 
 	booldut := PiecewiseCoding{
 		Name: "", //Needed only for floatStruct
@@ -124,9 +90,7 @@ func TestNumberOfBits(t *testing.T) {
 		},
 		Clamped: true,
 	}
-	if booldut.NumberOfBits() != 1 {
-		t.Errorf("Boolean do have more than 1 bit")
-	}
+	assert.Equal(t, 1, booldut.NumberOfBits())
 }
 
 func floatvectest(t *testing.T, got []float64, wanted []float64) {
@@ -257,9 +221,7 @@ func TestCode(t *testing.T) {
 	}
 
 	code, _ = dut1.BitCode(1)
-	if len(code) != 1 {
-		t.Errorf("one bit bit is not one in length")
-	}
+	assert.Equal(t, 1, len(code))
 
 	//2 bit test
 	dut2 := PiecewiseCoding{ //Define 4 state enum
@@ -272,8 +234,5 @@ func TestCode(t *testing.T) {
 
 	//Clamped mode. Means that values are already clamped
 	code, _ = dut2.BitCode(2)
-	if len(code) != 2 {
-		t.Errorf("one bit bit is not one in length")
-	}
-
+	assert.Equal(t, 2, len(code))
 }

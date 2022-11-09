@@ -346,3 +346,28 @@ func (p *PiecewiseFloats) Splurts7bitBytes(input interface{}) (SevenBitArr, erro
 	}
 	return p.Encode7bitBytes(m)
 }
+
+//ToStrings writes values with required number of decimals and enums in string format
+func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]string, error) {
+	result := make(map[string]string)
+	m, e := p.getValuesToFloatMap(input)
+	if e != nil {
+		return nil, e
+	}
+	for _, pw := range *p {
+		v, haz := m[pw.Name]
+		if !haz {
+			return nil, fmt.Errorf("internal error name %s in PiecewiseFloats is not found as value", pw.Name)
+		}
+		sval, svalErr := pw.ToStringValue(v)
+		if svalErr != nil {
+			return nil, fmt.Errorf("variable %v with value %v conversion to string fail err=%v", pw.Name, v, svalErr.Error())
+		}
+		if 0 < len(pw.Enums) && quotes {
+			result[pw.Name] = "\"" + sval + "\""
+		} else {
+			result[pw.Name] = sval
+		}
+	}
+	return result, nil
+}

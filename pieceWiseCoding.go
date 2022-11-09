@@ -8,6 +8,7 @@ package splurts
 import (
 	"fmt"
 	"math"
+	"strconv"
 )
 
 //PiecewiseCoding  first implementation
@@ -19,11 +20,68 @@ type PiecewiseCoding struct {
 	Enums   []string
 }
 
+//Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
+func (p *PiecewiseCoding) Decimals() int {
+	if 0 < len(p.Enums) {
+		return 0
+	}
+	if len(p.Steps) == 0 {
+		return 0
+	}
+	minStep := math.Abs(p.Steps[0].Size)
+	for _, step := range p.Steps {
+		minStep = math.Min(minStep, math.Abs(step.Size))
+	}
+
+	if 1 < minStep {
+		return 0
+	}
+	return int(math.Ceil(math.Abs(math.Log10(minStep))))
+}
+
+func (p *PiecewiseCoding) ToStringValue(f float64) (string, error) {
+	if len(p.Enums) == 0 {
+		//handling negative zero
+		formatstring := fmt.Sprintf("%%.%vf", p.Decimals())
+		s := fmt.Sprintf(formatstring, f)
+
+		f2, errInternal := strconv.ParseFloat(s, 64)
+		if errInternal != nil {
+			return s, errInternal
+		}
+		if math.Abs(f2) == 0 { //After rounding
+			return fmt.Sprintf(formatstring, float64(0)), nil
+		}
+		return s, nil
+
+	}
+	n := int(f)
+	if n == 0 {
+		return "", nil //First is empty string
+	}
+	if len(p.Enums) < n || n < 0 {
+		return "", fmt.Errorf("Have %v enums+empty, index is %v", len(p.Enums), n)
+	}
+	return p.Enums[n], nil
+}
+
+/*
+//Format string for printout
+func (p *PiecewiseCoding) FmtString() string {
+	if 0 < len(p.Steps) {
+		return "%s"
+	}
+	return fmt.Sprintf("%%.%vf", p.Decimals())
+}
+*/
+
 func (p PiecewiseCoding) String() string {
 	result := fmt.Sprintf("%v: (%v bits", p.Name, p.NumberOfBits())
 
 	if p.Clamped {
 		result += ",clamp) "
+	} else {
+		result += " )"
 	}
 	result += fmt.Sprintf(" from %v,  ", p.Min)
 	for _, step := range p.Steps {

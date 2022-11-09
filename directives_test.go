@@ -9,6 +9,8 @@ package splurts
 import (
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type ParticleMeas struct {
@@ -23,7 +25,7 @@ type ParticleMeas struct {
 	Emptyvalue   string  `splurts:"enum=NO,MAYBE,YES"`
 }
 
-func TestInfCase(t *testing.T) {
+func TestStringConversion(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
 	if errRecipe != nil {
 		t.Errorf("Recipe error %v", errRecipe)
@@ -31,7 +33,51 @@ func TestInfCase(t *testing.T) {
 
 	d := ParticleMeas{
 		SystemStatus: "MEASURE",
-		Temperature:  -40.5,
+		Temperature:  -40.149,
+		Humidity:     110.1291,
+		Pressure:     80000.51,
+		Small:        301.222,
+		Large:        -0.001, //TODO NO NEGATIVE string values
+		Extra:        2.1,
+	}
+
+	testString, _ := recipe.ToStrings(d, true)
+	v, haz := testString["SystemStatus"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "\"STOP\"", v)
+	v, haz = testString["Temperature"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "-40.1", v)
+	v, haz = testString["Humidity"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "110.13", v)
+	v, haz = testString["Pressure"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "80001", v)
+	v, haz = testString["Small"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "301.2", v)
+	v, haz = testString["Large"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "0.0", v)
+	v, haz = testString["Extra"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "2.1", v)
+	v, haz = testString["Heater"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "0", v)
+	v, haz = testString["Emptyvalue"]
+	assert.Equal(t, true, haz)
+	assert.Equal(t, "\"\"", v)
+}
+
+func TestInfCase(t *testing.T) {
+	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
+	assert.Equal(t, nil, errRecipe)
+
+	d := ParticleMeas{
+		SystemStatus: "MEASURE",
+		Temperature:  -40.1225,
 		Humidity:     110,
 		Pressure:     80000,
 		Small:        301,
@@ -40,36 +86,31 @@ func TestInfCase(t *testing.T) {
 	}
 
 	byt, errSplurt := recipe.Splurts(d)
-	if errSplurt != nil {
-		t.Errorf(errSplurt.Error())
-	} else {
-		newD := ParticleMeas{}
-		t.Logf("Splurted inf case %#v  (%v bytes)\n", byt, len(byt))
-		e := recipe.UnSplurts(byt, &newD)
-		if e != nil {
-			t.Errorf("Unsplurt err %v", e.Error())
-		} else {
-			t.Logf("New inf=%#v\n\n", newD)
+	assert.Equal(t, nil, errSplurt)
+	newD := ParticleMeas{}
+	t.Logf("Splurted inf case %#v  (%v bytes)\n", byt, len(byt))
+	e := recipe.UnSplurts(byt, &newD)
+	assert.Equal(t, nil, e)
+	t.Logf("New inf=%#v\n\n", newD)
 
-			if !math.IsInf(newD.Temperature, -1) {
-				t.Errorf("Inf error")
-			}
-			if !math.IsInf(newD.Humidity, 1) {
-				t.Errorf("Inf error")
-			}
-			if !math.IsInf(newD.Pressure, -1) {
-				t.Errorf("Inf error")
-			}
-
-			if !math.IsInf(newD.Small, 1) {
-				t.Errorf("Inf error")
-			}
-
-			if !math.IsInf(newD.Large, -1) {
-				t.Errorf("Inf error")
-			}
-		}
+	if !math.IsInf(newD.Temperature, -1) {
+		t.Errorf("Inf error")
 	}
+	if !math.IsInf(newD.Humidity, 1) {
+		t.Errorf("Inf error")
+	}
+	if !math.IsInf(newD.Pressure, -1) {
+		t.Errorf("Inf error")
+	}
+
+	if !math.IsInf(newD.Small, 1) {
+		t.Errorf("Inf error")
+	}
+
+	if !math.IsInf(newD.Large, -1) {
+		t.Errorf("Inf error")
+	}
+
 }
 
 func TestEasyUseCase(t *testing.T) {
@@ -80,43 +121,40 @@ func TestEasyUseCase(t *testing.T) {
 
 	d := ParticleMeas{SystemStatus: "IDLE", Temperature: 18.3, Humidity: 23.6, Pressure: 102400, Small: 23.2, Large: 41}
 	byt, errSplurt := recipe.Splurts(d)
-	if errSplurt != nil {
-		t.Errorf(errSplurt.Error())
-	} else {
-		newD := ParticleMeas{}
-		t.Logf("Splurted easy case %#v  (%v bytes)\n", byt, len(byt))
-		e := recipe.UnSplurts(byt, &newD)
-		if e != nil {
-			t.Errorf("Unsplurt err %v", e.Error())
-		} else {
-			t.Logf("NewD=%#v\n\n", newD)
+	assert.Equal(t, nil, errSplurt)
 
-			if newD.SystemStatus != d.SystemStatus {
-				t.Errorf("invalid system status %s vs %s", newD.SystemStatus, d.SystemStatus)
-			}
+	newD := ParticleMeas{}
+	t.Logf("Splurted easy case %#v  (%v bytes)\n", byt, len(byt))
+	e := recipe.UnSplurts(byt, &newD)
 
-			if 0.00001 < math.Abs(float64(newD.Temperature-d.Temperature)) {
-				t.Errorf("Invalid Temperature")
-			}
+	assert.Equal(t, nil, e)
 
-			if 0.00001 < math.Abs(float64(newD.Humidity-d.Humidity)) {
-				t.Errorf("Invalid")
-			}
+	t.Logf("NewD=%#v\n\n", newD)
 
-			if 0.00001 < math.Abs(float64(newD.Pressure-d.Pressure)) {
-				t.Errorf("Invalid")
-			}
-
-			if 0.00001 < math.Abs(float64(newD.Small-d.Small)) {
-				t.Errorf("Invalid")
-			}
-
-			if 0.00001 < math.Abs(float64(newD.Large-d.Large)) {
-				t.Errorf("Invalid")
-			}
-
-		}
+	if newD.SystemStatus != d.SystemStatus {
+		t.Errorf("invalid system status %s vs %s", newD.SystemStatus, d.SystemStatus)
 	}
+
+	if 0.00001 < math.Abs(float64(newD.Temperature-d.Temperature)) {
+		t.Errorf("Invalid Temperature")
+	}
+
+	if 0.00001 < math.Abs(float64(newD.Humidity-d.Humidity)) {
+		t.Errorf("Invalid")
+	}
+
+	if 0.00001 < math.Abs(float64(newD.Pressure-d.Pressure)) {
+		t.Errorf("Invalid")
+	}
+
+	if 0.00001 < math.Abs(float64(newD.Small-d.Small)) {
+		t.Errorf("Invalid")
+	}
+
+	if 0.00001 < math.Abs(float64(newD.Large-d.Large)) {
+		t.Errorf("Invalid")
+	}
+
 }
 
 //--------------------------
@@ -231,9 +269,7 @@ type AllCases struct {
 
 func Test7bitCompleteCase(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(AllCases{})
-	if errRecipe != nil {
-		t.Errorf("Recipe error %v", errRecipe)
-	}
+	assert.Equal(t, nil, errRecipe)
 
 	t.Logf("\nCOMPLETE RECIPE IS \n%v\n\n", recipe)
 
@@ -328,9 +364,7 @@ func Test7bitCompleteCase(t *testing.T) {
 
 func TestCompleteCase(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(AllCases{})
-	if errRecipe != nil {
-		t.Errorf("Recipe error %v", errRecipe)
-	}
+	assert.Equal(t, nil, errRecipe)
 
 	t.Logf("\nCOMPLETE RECIPE IS \n%v\n\n", recipe)
 
@@ -356,69 +390,64 @@ func TestCompleteCase(t *testing.T) {
 	}
 
 	byt, errSplurt := recipe.Splurts(d)
-	if errSplurt != nil {
-		t.Errorf(errSplurt.Error())
-	} else {
-		t.Logf("SPLURTS %#v (len=%v)\n", byt, len(byt))
-		newD := AllCases{}
-		e := recipe.UnSplurts(byt, &newD)
-		if e != nil {
-			t.Errorf("Unsplurt err %v", e.Error())
-		} else {
-			t.Logf("NewD=%#v\n\n", newD)
-			if 0.00001 < math.Abs(newD.Alpha-d.Alpha) {
-				t.Errorf("Invalid")
-			}
-			if 0.00001 < math.Abs(float64(newD.Bravo-d.Bravo)) {
-				t.Errorf("Invalid")
-			}
-			if 0.00001 < math.Abs(float64(newD.Charlie-d.Charlie)) {
-				t.Errorf("Invalid")
-			}
-			if 0.00001 < math.Abs(float64(newD.Delta-d.Delta)) {
-				t.Errorf("Invalid")
-			}
-			if newD.Echo != d.Echo {
-				t.Errorf("Invalid")
-			}
+	assert.Equal(t, nil, errSplurt)
 
-			if 0.00001 < math.Abs(float64(newD.Foxtrot-d.Foxtrot)) {
-				t.Errorf("Invalid Foxtrot %v vs %v", newD.Foxtrot, d.Foxtrot)
-			}
+	t.Logf("SPLURTS %#v (len=%v)\n", byt, len(byt))
+	newD := AllCases{}
+	e := recipe.UnSplurts(byt, &newD)
+	assert.Equal(t, nil, e)
 
-			if 0.00001 < math.Abs(float64(newD.Golf-d.Golf)) {
-				t.Errorf("Invalid Golf %v vs %v", newD.Golf, d.Golf)
-			}
+	t.Logf("NewD=%#v\n\n", newD)
+	if 0.00001 < math.Abs(newD.Alpha-d.Alpha) {
+		t.Errorf("Invalid")
+	}
+	if 0.00001 < math.Abs(float64(newD.Bravo-d.Bravo)) {
+		t.Errorf("Invalid")
+	}
+	if 0.00001 < math.Abs(float64(newD.Charlie-d.Charlie)) {
+		t.Errorf("Invalid")
+	}
+	if 0.00001 < math.Abs(float64(newD.Delta-d.Delta)) {
+		t.Errorf("Invalid")
+	}
+	if newD.Echo != d.Echo {
+		t.Errorf("Invalid")
+	}
 
-			if 0.00001 < math.Abs(float64(newD.Hotel-d.Hotel)) {
-				t.Errorf("Invalid %v vs %v", newD.Hotel, d.Hotel)
-			}
+	if 0.00001 < math.Abs(float64(newD.Foxtrot-d.Foxtrot)) {
+		t.Errorf("Invalid Foxtrot %v vs %v", newD.Foxtrot, d.Foxtrot)
+	}
 
-			if 0.00001 < math.Abs(float64(newD.India-d.India)) {
-				t.Errorf("Invalid")
-			}
+	if 0.00001 < math.Abs(float64(newD.Golf-d.Golf)) {
+		t.Errorf("Invalid Golf %v vs %v", newD.Golf, d.Golf)
+	}
 
-			if 0.00001 < math.Abs(float64(newD.Juliet-d.Juliet)) {
-				t.Errorf("Invalid")
-			}
+	if 0.00001 < math.Abs(float64(newD.Hotel-d.Hotel)) {
+		t.Errorf("Invalid %v vs %v", newD.Hotel, d.Hotel)
+	}
 
-			if 0.00001 < math.Abs(float64(newD.Kilo-d.Kilo)) {
-				t.Errorf("Invalid")
-			}
+	if 0.00001 < math.Abs(float64(newD.India-d.India)) {
+		t.Errorf("Invalid")
+	}
 
-			if 0.00001 < math.Abs(float64(newD.Lima-d.Lima)) {
-				t.Errorf("Invalid")
-			}
+	if 0.00001 < math.Abs(float64(newD.Juliet-d.Juliet)) {
+		t.Errorf("Invalid")
+	}
 
-			if 0.00001 < math.Abs(float64(newD.Mike-d.Mike)) {
-				t.Errorf("Invalid Mike %v vs %v", newD.Mike, d.Mike)
-			}
+	if 0.00001 < math.Abs(float64(newD.Kilo-d.Kilo)) {
+		t.Errorf("Invalid")
+	}
 
-			if 0.00001 < math.Abs(float64(newD.November-d.November)) {
-				t.Errorf("Invalid November %v vs %v", newD.November, d.November)
-			}
+	if 0.00001 < math.Abs(float64(newD.Lima-d.Lima)) {
+		t.Errorf("Invalid")
+	}
 
-		}
+	if 0.00001 < math.Abs(float64(newD.Mike-d.Mike)) {
+		t.Errorf("Invalid Mike %v vs %v", newD.Mike, d.Mike)
+	}
+
+	if 0.00001 < math.Abs(float64(newD.November-d.November)) {
+		t.Errorf("Invalid November %v vs %v", newD.November, d.November)
 	}
 
 }
@@ -434,20 +463,15 @@ func TestSevenBitADC(t *testing.T) {
 	a := SevenBitADC{AdcVoltage: -0.32, MessageCounter: 1}
 
 	recipe, errRecipe := GetPiecewisesFromStruct(SevenBitADC{})
-	if errRecipe != nil {
-		t.Errorf("Recipe error %v", errRecipe)
-	}
+	assert.Equal(t, nil, errRecipe)
 
 	bitArr, toBitArrErr := recipe.Splurts7bitBytes(a)
-	if toBitArrErr != nil {
-		t.Errorf("Splurt error %v", toBitArrErr.Error())
-	}
+	assert.Equal(t, nil, toBitArrErr)
 
 	b := SevenBitADC{}
 	errUnsplurt := recipe.UnSplurts7bitBytes(bitArr, &b)
-	if errUnsplurt != nil {
-		t.Errorf("Unsplurt error %v", errUnsplurt.Error())
-	}
+	assert.Equal(t, nil, errUnsplurt)
+
 	if a.MessageCounter != b.MessageCounter {
 		t.Errorf("Seven bit err %#v vs %#v,  (arr=%#v)", a, b, bitArr)
 	}
@@ -465,20 +489,13 @@ type Simple7 struct {
 func Test7bitSimpleCase(t *testing.T) {
 	a := Simple7{A: 5, B: 1.5, C: 5, D: 15, E: 0, F: 0}
 	recipe, errRecipe := GetPiecewisesFromStruct(Simple7{})
-	if errRecipe != nil {
-		t.Errorf("Recipe error %v", errRecipe)
-	}
-	bitArr, toBitArrErr := recipe.Splurts7bitBytes(a)
-	if toBitArrErr != nil {
-		t.Errorf("Splurt error %v", toBitArrErr.Error())
-	}
+	assert.Equal(t, nil, errRecipe)
 
-	//t.Errorf("KOODATTU %#v", bitArr)
+	bitArr, toBitArrErr := recipe.Splurts7bitBytes(a)
+	assert.Equal(t, nil, toBitArrErr)
 
 	b := SevenBitADC{}
 	errUnsplurt := recipe.UnSplurts7bitBytes(bitArr, &b)
-	if errUnsplurt != nil {
-		t.Errorf("Unsplurt error %v", errUnsplurt.Error())
-	}
+	assert.Equal(t, nil, errUnsplurt)
 
 }

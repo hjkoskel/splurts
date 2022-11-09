@@ -31,6 +31,7 @@ If range is fixed it is possible to write splurts directives on struct (compile 
 
 ```go
 type ParticleMeas struct {
+	SystemStatus string  `splurts:"enum=INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
 	Temperature float64 `splurts:"step=0.1,min=-40,max=40"`
 	Humidity    float64 `splurts:"step=0.05,min=0,max=100"`
 	Pressure    float64 `splurts:"step=100,min=85000,max=110000"`
@@ -50,13 +51,18 @@ PiecewiseFloats documents binary format. On some applications you might want cre
 
 Then use Splurts metod for creating byte array.
 ```go
-func (p *PiecewiseFloats) Splurts(input interface{}) ([]byte, error) {
+func (p *PiecewiseFloats) Splurts(input interface{}) ([]byte, error)
 ```
 
 When byte array is recieved from communications channel or loaded. Uncompressing is done by creating or loading PiecewiseFloats and doing Unsplurts. (remember & )
 
 ```go
 func (p *PiecewiseFloats) UnSplurts(raw []byte, output interface{}) error
+```
+
+Splurts library also provides rounding functions for formatting struct float values in efficient way. Typical use would be situation where data is inserted to database by generating insert command
+```go
+func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]string, error) 
 ```
 
 please check unit tests as example how to use library
@@ -85,7 +91,13 @@ Mandatory parameters are
       * like 5|10|0.5|20|5|30|   (10 steps 5.0 each then 20 steps each 0.5 then 30 steps 5.0 each)
 * *clamped*, optional  (only clamped key)
 
+## Enums
 
+Enum directive allows to translate string constant to number. Empty value is coded as 0. Enums are working only with string type
+
+```go
+	SystemStatus string  `splurts:"enum=UNDEFINED,INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
+```
 
 # All cases example
 
