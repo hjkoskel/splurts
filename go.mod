@@ -1,4 +1,4 @@
-module splurts
+module github.com/hjkoskel/splurts
 
 go 1.18
 
