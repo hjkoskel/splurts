@@ -36,7 +36,8 @@ type ParticleMeas struct {
 	Humidity    float64 `splurts:"step=0.05,min=0,max=100"`
 	Pressure    float64 `splurts:"step=100,min=85000,max=110000"`
 	Small       float64 `splurts:"step=0.1,min=0,max=300"`
-	Large       float64 `splurts:"step=0.1,min=0,max=300"`
+	Large       float64 `splurts:"step=0.1,min=0,max=300,infpos=99999,infneg=-99999"`
+
 	Heater      bool    //Status flag for heater enabled
 }
 ```
@@ -77,7 +78,10 @@ On simple case following parameters are required for float
 * *step*, stepsize
 
 integer values use step=1 as default. Boolean values do not need any directives
-There is optional directive **clamped**. If clamped is present no -Inf, Inf, and NaN codes are not reserved
+There is optional directive **clamped**. If clamped is present no -Inf, Inf, and NaN codes are not reserved.
+
+But if clamped is not defined, value can become +Inf and -Inf. Some systems (influxdb, JSON etc..) can not handle +Inf and -Inf values. For that reason it is possible to define optional float64 parameters
+**infpos** for replacing +Inf  and **infneg** for replacing -Inf
 
 Also multiple step sizes are supported. It is not recommended to use multiple step sizes on actual range where useful data is.
 Might cause problems, disortions etc... on data analysis. Typical use case would be like temperature measurement system have range -40 to 40.
@@ -90,6 +94,7 @@ Mandatory parameters are
     * coded in format =size0|count0| size1|count1|size2|count2
       * like 5|10|0.5|20|5|30|   (10 steps 5.0 each then 20 steps each 0.5 then 30 steps 5.0 each)
 * *clamped*, optional  (only clamped key)
+
 
 ## Enums
 
@@ -121,4 +126,21 @@ type AllCases struct {
 	Mike     float64 `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
 	November int     `splurts:"min=-100,steps=5.0 10|0.5 100|1.5 10,clamped"`
 }
+```
+
+# Exporting
+
+Exporting struct correctly, expecially in case of text format is sometimes hard.
+One typical problem is that too few or too many decimals are printed on text formatted output
+
+## Export to CSV format
+Function ToCsv takes struct with splurts defined values. Or array/slice of structs with splurt directives.
+Parameter separator tells how columns are separated. Typical separator is by tabulator "\t" or ";" for half comma.
+
+Columns is array of variable names that tell order of the colums. This array can left empty. Empty columns mean that all fields are exported to CSV. **skipNaNRows** allows to set code to skip rows in CSV with NaN values. This feature is needed for avoiding NaN values on export.
+
+Values like +Inf and -Inf can be avoided by setting **infpos** and **infneg** on struct
+
+```go
+func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []string, skipNaNRows bool) (string, error) {
 ```

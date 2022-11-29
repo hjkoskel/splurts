@@ -16,8 +16,10 @@ const (
 	DIRECTIVEMAX     = "max"
 	DIRECTIVESTEP    = "step"
 	DIRECTIVESTEPS   = "steps"
-	DIRECTIVEBITS    = "bits" //Use instead of step or steps
-	DIRECTIVEENUM    = "enum" //Used for string datatypes, array of strings of names
+	DIRECTIVEBITS    = "bits"   //Use instead of step or steps
+	DIRECTIVEENUM    = "enum"   //Used for string datatypes, array of strings of names
+	DIRECTIVEINFPOS  = "infpos" //Override inf+ value
+	DIRECTIVEINFNEG  = "infneg" //Override inf- value
 )
 
 type DirectiveSettings struct { //For parsed
@@ -30,6 +32,11 @@ type DirectiveSettings struct { //For parsed
 
 	MinDefined bool
 	MaxDefined bool
+
+	InfPosDefined bool
+	InfNegDefined bool
+	InfPos        float64
+	InfNeg        float64
 
 	Enums []string
 }
@@ -92,6 +99,22 @@ func parseDirectives(tag string) (DirectiveSettings, error) {
 		}
 		if len(eqsplit) == 2 {
 			switch eqsplit[0] {
+			case DIRECTIVEINFPOS:
+				f, ferr := strconv.ParseFloat(eqsplit[1], 64)
+				if ferr != nil {
+					return result, fmt.Errorf("invalid tag %v, invalid token %v parse error %v", tag, tok, ferr.Error())
+				}
+				result.InfPos = f
+				result.InfPosDefined = true
+
+			case DIRECTIVEINFNEG:
+				f, ferr := strconv.ParseFloat(eqsplit[1], 64)
+				if ferr != nil {
+					return result, fmt.Errorf("invalid tag %v, invalid token %v parse error %v", tag, tok, ferr.Error())
+				}
+				result.InfNeg = f
+				result.InfNegDefined = true
+
 			case DIRECTIVEMIN:
 				f, ferr := strconv.ParseFloat(eqsplit[1], 64)
 				if ferr != nil {
@@ -142,6 +165,11 @@ func parseDirectives(tag string) (DirectiveSettings, error) {
 		}
 	}
 
+	//Sanity check
+	if result.Clamped && (result.InfPosDefined || result.InfNegDefined) {
+		return result, fmt.Errorf("clamped and infpos/infneg can not be defined at same time")
+	}
+
 	return result, nil
 }
 
@@ -155,7 +183,19 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 		return PiecewiseCoding{}, fmt.Errorf("%v fail %v", name, dirErr.Error())
 	}
 
-	result := PiecewiseCoding{Name: name, Min: dir.Min, Steps: dir.Steps, Clamped: dir.Clamped, Enums: dir.Enums}
+	result := PiecewiseCoding{
+		Name:    name,
+		Min:     dir.Min,
+		Steps:   dir.Steps,
+		Clamped: dir.Clamped,
+		Enums:   dir.Enums,
+
+		InfPosDefined: dir.InfPosDefined,
+		InfNegDefined: dir.InfNegDefined,
+		InfPos:        dir.InfPos,
+		InfNeg:        dir.InfNeg,
+	}
+
 	if 0 < len(result.Steps) {
 		return result, nil //OK
 	}
@@ -244,7 +284,14 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 		f := elem.Field(i)
 
 		if f.IsValid() {
+
 			name := typeOfS.Field(i).Name
+
+			pw, foundErr := p.getCoding(name)
+			if foundErr != nil {
+				return result, foundErr
+			}
+
 			switch f.Type().Name() {
 			case "float64", "float32":
 				result[name] = f.Float()
@@ -258,10 +305,6 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 					result[name] = 1
 				}
 			case "string":
-				pw, foundErr := p.getCoding(name)
-				if foundErr != nil {
-					return result, foundErr
-				}
 				stringvalue := f.String()
 
 				if stringvalue == "" {
@@ -279,6 +322,14 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 						return result, fmt.Errorf("Unknown enum %s for %s (valid enums are %#v)", stringvalue, name, pw.Enums)
 					}
 				}
+			}
+
+			f, _ := result[name]
+			if pw.InfPosDefined && math.IsInf(f, 1) {
+				result[name] = pw.InfPos
+			}
+			if pw.InfNegDefined && math.IsInf(f, -1) {
+				result[name] = pw.InfNeg
 			}
 		}
 	}
@@ -354,6 +405,7 @@ func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]
 	if e != nil {
 		return nil, e
 	}
+
 	for _, pw := range *p {
 		v, haz := m[pw.Name]
 		if !haz {
@@ -370,4 +422,66 @@ func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]
 		}
 	}
 	return result, nil
+}
+
+func (p *PiecewiseFloats) Names() []string {
+	result := make([]string, len(*p))
+	for i, a := range *p {
+		result[i] = a.Name
+	}
+	return result
+}
+
+func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []string, skipNaNRows bool) (string, error) {
+	rt := reflect.TypeOf(input)
+
+	if len(columns) == 0 {
+		columns = p.Names()
+	}
+	switch rt.Kind() {
+	case reflect.Slice, reflect.Array:
+		vo := reflect.ValueOf(input)
+		count := vo.Len()
+		var sb strings.Builder
+		for i := 0; i < count; i++ {
+			item := vo.Index(i)
+			s, csvErr := p.ToCsv(item.Interface(), separator, columns, skipNaNRows)
+			if csvErr != nil {
+				return sb.String(), fmt.Errorf("failed on row %v err=%v", i, csvErr.Error())
+			}
+			if 0 < len(s) {
+				_, errWrite := sb.WriteString(s + "\n")
+				if errWrite != nil {
+					return "", errWrite
+				}
+			}
+		}
+		return sb.String(), nil
+
+	case reflect.Struct:
+		valuemap, errStrings := p.ToStrings(input, false)
+		if errStrings != nil {
+			return "", errStrings
+		}
+		var sb strings.Builder
+		for _, name := range columns {
+			v, haz := valuemap[name]
+			if !haz {
+				return "", fmt.Errorf("internal error no name %v in map %#v", v, valuemap)
+			}
+			if v == "NaN" && skipNaNRows {
+				return "", nil //Skip this
+			}
+
+			if 0 < len(v) {
+				if 0 < sb.Len() {
+					sb.WriteString(separator)
+				}
+				sb.WriteString(v)
+			}
+
+		}
+		return sb.String(), nil
+	}
+	return "", fmt.Errorf("not supported %v", rt.Kind())
 }

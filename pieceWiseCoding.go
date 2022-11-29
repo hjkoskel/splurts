@@ -18,6 +18,11 @@ type PiecewiseCoding struct {
 	Steps   []PiecewiseCodingStep
 	Clamped bool //No  NaN  -Inf +Inf, just raw value.. Used for flags etc...
 	Enums   []string
+
+	InfPosDefined bool
+	InfNegDefined bool
+	InfPos        float64
+	InfNeg        float64
 }
 
 //Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
@@ -32,7 +37,6 @@ func (p *PiecewiseCoding) Decimals() int {
 	for _, step := range p.Steps {
 		minStep = math.Min(minStep, math.Abs(step.Size))
 	}
-
 	if 1 < minStep {
 		return 0
 	}
@@ -241,9 +245,15 @@ func (p *PiecewiseCoding) ScaleToFloat(v uint64) float64 {
 			return math.NaN()
 		}
 		if v == 0 {
+			if p.InfNegDefined {
+				return p.InfNeg
+			}
 			return math.Inf(-1)
 		}
 		if v == maxv-1 {
+			if p.InfPosDefined {
+				return p.InfPos
+			}
 			return math.Inf(1)
 		}
 	}
@@ -263,6 +273,9 @@ func (p *PiecewiseCoding) ScaleToFloat(v uint64) float64 {
 	}
 	if p.Clamped { //Extrapolate up with latest step size. Usually should not need
 		return total + float64(v-uint64(p.TotalStepCount()))*p.Steps[len(p.Steps)-1].Size
+	}
+	if p.InfPosDefined {
+		return p.InfPos
 	}
 	return math.Inf(1)
 }

@@ -19,7 +19,7 @@ type ParticleMeas struct {
 	Humidity     float64 `splurts:"step=0.05,min=0,max=100"`
 	Pressure     float64 `splurts:"step=100,min=85000,max=110000"`
 	Small        float64 `splurts:"step=0.1,min=0,max=300"`
-	Large        float64 `splurts:"step=0.1,min=0,max=300"`
+	Large        float64 `splurts:"step=0.1,min=0,max=300,infpos=99999,infneg=-99999"`
 	Extra        float64 `splurts:"step=0.1,min=0,bits=14"`
 	Heater       bool    //Flag for heater enabled
 	Emptyvalue   string  `splurts:"enum=NO,MAYBE,YES"`
@@ -107,8 +107,11 @@ func TestInfCase(t *testing.T) {
 		t.Errorf("Inf error")
 	}
 
-	if !math.IsInf(newD.Large, -1) {
+	/*if !math.IsInf(newD.Large, -1) {
 		t.Errorf("Inf error")
+	}*/
+	if newD.Large != -99999 {
+		t.Errorf("neg inf not working")
 	}
 
 }
@@ -497,5 +500,53 @@ func Test7bitSimpleCase(t *testing.T) {
 	b := SevenBitADC{}
 	errUnsplurt := recipe.UnSplurts7bitBytes(bitArr, &b)
 	assert.Equal(t, nil, errUnsplurt)
+
+}
+
+type InvalidInfStruct struct {
+	A     int     `splurts:"min=0,bits=5,clamped"`
+	Wrong float64 `splurts:"step=0.1,min=0,max=300,infpos=99999,infneg=-99999,clamped"`
+	B     int     `splurts:"min=0,bits=5,clamped"`
+}
+
+func TestInvalidInfConf(t *testing.T) {
+	_, errInf := GetPiecewisesFromStruct(InvalidInfStruct{})
+	assert.NotEqual(t, nil, errInf)
+}
+
+func TestCsv(t *testing.T) {
+	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
+	assert.Equal(t, nil, errRecipe)
+	meas1 := ParticleMeas{
+		SystemStatus: "MEASURE",
+		Temperature:  -40.149,
+		Humidity:     110.1291,
+		Pressure:     80000.51,
+		Small:        301.222,
+		Large:        -0.001,
+		Extra:        2.1,
+	}
+	arr := []ParticleMeas{meas1, meas1}
+	meas1.Temperature = math.NaN()
+	arr = append(arr, meas1)
+	meas1.Temperature = 3
+	meas1.Large = math.Inf(1)
+	arr = append(arr, meas1)
+	meas1.Temperature = 5
+	meas1.Large = math.Inf(-1)
+	arr = append(arr, meas1)
+	meas1.Large = 0
+	meas1.Small = math.Inf(1)
+	arr = append(arr, meas1)
+
+	txt, errCsv := recipe.ToCsv(arr, "\t", []string{}, true)
+	//txt, errCsv := recipe.ToCsv(meas1, "\t", []string{})
+	assert.Equal(t, nil, errCsv)
+	assert.Equal(t, "STOP\t-40.1\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t-40.1\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t3.0\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nSTOP\t5.0\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nSTOP\t5.0\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
+
+	txtTempHum, errTempHum := recipe.ToCsv(arr, "\t", []string{"Temperature", "Humidity"}, true)
+	assert.Equal(t, nil, errTempHum)
+
+	assert.Equal(t, "-40.1\t110.13\n-40.1\t110.13\n3.0\t110.13\n5.0\t110.13\n5.0\t110.13\n", txtTempHum)
 
 }
