@@ -26,6 +26,10 @@ func (p *PiecewiseFloats) getCoding(name string) (PiecewiseCoding, error) {
 func (p PiecewiseFloats) String() string {
 	result := ""
 	for i, a := range p {
+		if a.Omit {
+			result += fmt.Sprintf("%v: %v OMITED\n", i, a)
+			continue
+		}
 		if 0 < len(a.Enums) {
 			result += fmt.Sprintf("%v: %v (enums:%#v)\n", i, a, a.Enums)
 		} else {
@@ -79,6 +83,9 @@ func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float
 	}
 
 	for _, a := range *p {
+		if a.Omit {
+			continue
+		}
 		//Pick bits for variable
 		bits := a.NumberOfBits()
 		piece := binstr[0:bits]
@@ -99,6 +106,9 @@ func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float
 		v := a.ScaleToFloat(uint64(pieceval))
 		if !math.IsNaN(v) || (allowNaN && math.IsNaN(v)) {
 			result[a.Name] = v
+		}
+		if a.ConstDefined && a.Const != v {
+			return result, fmt.Errorf("const field %v is %v not %v", a.Name, v, a.Const)
 		}
 	}
 	return result, nil
@@ -146,6 +156,9 @@ func (p *PiecewiseFloats) Decode7bitBytes(binarr SevenBitArr, allowNaN bool) (ma
 //IsInvalid check with this before further proceccing
 func (p *PiecewiseFloats) IsInvalid() error {
 	for i, a := range *p {
+		if a.Omit {
+			continue
+		}
 		if a.Name == "" {
 			return fmt.Errorf("Name on index %v is not defined", i)
 		}
@@ -160,6 +173,9 @@ func (p *PiecewiseFloats) IsInvalid() error {
 func (p *PiecewiseFloats) EncodeToBitString(values map[string]float64) string {
 	bitString := ""
 	for _, a := range *p {
+		if a.Omit {
+			continue
+		}
 		f, haz := values[a.Name]
 		if haz {
 			s, _ := a.BitCode(f)

@@ -117,7 +117,6 @@ func TestExample(t *testing.T) {
 	if !math.IsNaN(nanPressure) {
 		t.Errorf("Pressure is not NAN")
 	}
-
 	//Invalidty check
 	parsed, parseErr = structure.Decode([]byte{4, 2}, true)
 	if parseErr == nil {

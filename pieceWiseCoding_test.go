@@ -231,7 +231,6 @@ func TestCode(t *testing.T) {
 			PiecewiseCodingStep{Size: 1, Count: 4},
 		},
 	}
-
 	//Clamped mode. Means that values are already clamped
 	code, _ = dut2.BitCode(2)
 	assert.Equal(t, 2, len(code))

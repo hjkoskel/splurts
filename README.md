@@ -33,6 +33,7 @@ If range is fixed it is possible to write splurts directives on struct (compile 
 type ParticleMeas struct {
 	SystemStatus string  `splurts:"enum=INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
 	Temperature float64 `splurts:"step=0.1,min=-40,max=40"`
+	StaticSymbol int     `splurts:"bits=7,const=42"`
 	Humidity    float64 `splurts:"step=0.05,min=0,max=100"`
 	Pressure    float64 `splurts:"step=100,min=85000,max=110000"`
 	Small       float64 `splurts:"step=0.1,min=0,max=300"`
@@ -104,6 +105,11 @@ Enum directive allows to translate string constant to number. Empty value is cod
 	SystemStatus string  `splurts:"enum=UNDEFINED,INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
 ```
 
+## Consts
+It is possible to define struct variable to constant with directive **constant** . When splurtsing struct to binary, value is overridden by constant definition. When unsplurtsing it is required that binary contains that constant value.
+
+This feature can be used when communication packets are 
+
 # All cases example
 
 Following is collection of examples how to use splurts directives
@@ -144,3 +150,43 @@ Values like +Inf and -Inf can be avoided by setting **infpos** and **infneg** on
 ```go
 func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []string, skipNaNRows bool) (string, error) {
 ```
+
+# Incoming new features
+
+- const field support
+- omit field support, do not process that variable
+- support for time.Time conversion to binary format
+	- epoch time... timezones..precisions
+	- Bad... use epoch+bootcounter?
+	- relative time uses omited absolute field?
+- directives that link variables
+	- One variable is "errorOf" or timedelta of some other variable
+	- Variable is derived some other value (maybe not present) like there are can be
+		-min/max/avg/std...  each point to same value (that is not present anymore)
+		-helps when creating plots or compressing
+	- Variable is official timestamp (with defined... is epoch)
+- physics related directives for plots and reporting
+	- *precision* directive for constant precision (how tightly packed, how many decimals in text printout, error bars etc..) Overrides stepsize for presentation
+		- TODO absolute vs percent
+	- accuracy directive, realistic or tells how much meaningful decimals there are  (not actual use yet, but reserve directive). OR give plusminus symbol to printout.
+		- TODO absolute vs percent!!
+	- Unit, SI-units and derivates
+		- allow smart conversion? 
+		- Quality, "voltage","temperature"
+		- Grouping and tagging in plot and database exports
+	- MeasBw, what is bandwidth in Hz where actual info is.  Used when zooming out (prevent antialiasing). Also reaction time. Can used also when doing lossy compression (filtering, dropping points etc...)
+	- SignalBw, signal of bandwidth in measurement (wider than measBw) signal+extra noise band
+	- MeasBwStart, where bandwidth starts, default is 0
+	- fs, nominal update rate
+	- time window, one point. How much it covers in time (like RMS value from window)
+	- Equations,  for derivering values
+- Tags, for time series database export
+- endianess support
+- sparse mode
+- plotdata export
+	- ranges based on maximum ranges of values
+	- time axis conversion (that is pain)
+- matlab export
+- protobuf like extraction/de-extraction code generation
+	- golang, C, javascript, assemblyscript
+	- also data export to constant byte arrays

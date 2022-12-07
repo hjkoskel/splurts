@@ -7,6 +7,7 @@ Use this as example
 package splurts
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -16,13 +17,27 @@ import (
 type ParticleMeas struct {
 	SystemStatus string  `splurts:"enum=UNDEFINED,INITIALIZE,IDLE,MEASURE,STOP,ERROR"`
 	Temperature  float64 `splurts:"step=0.1,min=-40,max=40"`
+	StaticSymbol int     `splurts:"bits=7,const=42"`
 	Humidity     float64 `splurts:"step=0.05,min=0,max=100"`
 	Pressure     float64 `splurts:"step=100,min=85000,max=110000"`
 	Small        float64 `splurts:"step=0.1,min=0,max=300"`
 	Large        float64 `splurts:"step=0.1,min=0,max=300,infpos=99999,infneg=-99999"`
 	Extra        float64 `splurts:"step=0.1,min=0,bits=14"`
-	Heater       bool    //Flag for heater enabled
+	Heater       bool    `splurts:"enum=NOTHEATING,HEATING"` //Flag for heater enabled
 	Emptyvalue   string  `splurts:"enum=NO,MAYBE,YES"`
+}
+
+func TestNotMatchingConst(t *testing.T) {
+	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
+	if errRecipe != nil {
+		t.Errorf("Recipe error %v", errRecipe)
+	}
+
+	d := ParticleMeas{}
+	byt, _ := recipe.Splurts(d)
+	byt = make([]byte, len(byt)) //zero out
+	e := recipe.UnSplurts(byt, d)
+	assert.Equal(t, fmt.Errorf("const field StaticSymbol is -Inf not 42"), e)
 }
 
 func TestStringConversion(t *testing.T) {
@@ -92,6 +107,8 @@ func TestInfCase(t *testing.T) {
 	e := recipe.UnSplurts(byt, &newD)
 	assert.Equal(t, nil, e)
 	t.Logf("New inf=%#v\n\n", newD)
+
+	assert.Equal(t, newD.StaticSymbol, 42)
 
 	if !math.IsInf(newD.Temperature, -1) {
 		t.Errorf("Inf error")
@@ -259,6 +276,9 @@ type AllCases struct {
 	Golf    int     `splurts:"min=-10,steps=2.0 5|1.0 100"`
 	Hotel   float32 `splurts:"step=0.1,min=-40,max=40,clamped"`
 
+	LeaveThisOut     float64 `splurts:"omit"`
+	LeaveThisOutAlso float64 `splurts:"omit"`
+
 	India    float64 `splurts:"step=0.1,min=-40,max=40,clamped"`
 	Juliet   float32 `splurts:"step=0.1,min=-40,max=40,clamped"`
 	Kilo     int32   `splurts:"min=7,max=100,clamped"` //integers have default stepsize 1
@@ -309,57 +329,47 @@ func Test7bitCompleteCase(t *testing.T) {
 		} else {
 			t.Logf("NewD=%#v\n\n", newD)
 			if 0.00001 < math.Abs(newD.Alpha-d.Alpha) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Alpha")
 			}
 			if 0.00001 < math.Abs(float64(newD.Bravo-d.Bravo)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Bravo")
 			}
 			if 0.00001 < math.Abs(float64(newD.Charlie-d.Charlie)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Charlie")
 			}
 			if 0.00001 < math.Abs(float64(newD.Delta-d.Delta)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Delta")
 			}
 			if newD.Echo != d.Echo {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Echo")
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Foxtrot-d.Foxtrot)) {
 				t.Errorf("Invalid Foxtrot %v vs %v", newD.Foxtrot, d.Foxtrot)
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Golf-d.Golf)) {
 				t.Errorf("Invalid Golf %v vs %v", newD.Golf, d.Golf)
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Hotel-d.Hotel)) {
 				t.Errorf("Invalid %v vs %v", newD.Hotel, d.Hotel)
 			}
-
 			if 0.00001 < math.Abs(float64(newD.India-d.India)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid India")
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Juliet-d.Juliet)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Julia")
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Kilo-d.Kilo)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Kilo")
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Lima-d.Lima)) {
-				t.Errorf("Invalid")
+				t.Errorf("Invalid Lima")
 			}
-
 			if 0.00001 < math.Abs(float64(newD.Mike-d.Mike)) {
 				t.Errorf("Invalid Mike %v vs %v", newD.Mike, d.Mike)
 			}
-
 			if 0.00001 < math.Abs(float64(newD.November-d.November)) {
 				t.Errorf("Invalid November %v vs %v", newD.November, d.November)
 			}
-
 		}
 	}
 
@@ -542,11 +552,10 @@ func TestCsv(t *testing.T) {
 	txt, errCsv := recipe.ToCsv(arr, "\t", []string{}, true)
 	//txt, errCsv := recipe.ToCsv(meas1, "\t", []string{})
 	assert.Equal(t, nil, errCsv)
-	assert.Equal(t, "STOP\t-40.1\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t-40.1\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t3.0\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nSTOP\t5.0\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nSTOP\t5.0\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
+	assert.Equal(t, "STOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t3.0\t42\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
 
 	txtTempHum, errTempHum := recipe.ToCsv(arr, "\t", []string{"Temperature", "Humidity"}, true)
 	assert.Equal(t, nil, errTempHum)
 
 	assert.Equal(t, "-40.1\t110.13\n-40.1\t110.13\n3.0\t110.13\n5.0\t110.13\n5.0\t110.13\n", txtTempHum)
-
 }

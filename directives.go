@@ -20,9 +20,12 @@ const (
 	DIRECTIVEENUM    = "enum"   //Used for string datatypes, array of strings of names
 	DIRECTIVEINFPOS  = "infpos" //Override inf+ value
 	DIRECTIVEINFNEG  = "infneg" //Override inf- value
+	DIRECTIVECONST   = "const"  //constant value, set when splurtsing to binary. Required when converting to binary
+	DIRECTIVEOMIT    = "omit"   //do not splurt or unsplurt this variable
 )
 
 type DirectiveSettings struct { //For parsed
+	Omit    bool
 	Clamped bool
 	Min     float64
 	Max     float64
@@ -39,6 +42,7 @@ type DirectiveSettings struct { //For parsed
 	InfNeg        float64
 
 	Enums []string
+	Const string
 }
 
 // StepCount, if can not calc then 0
@@ -50,22 +54,49 @@ func (p *DirectiveSettings) StepCount() uint64 {
 	return count
 }
 
-/*
-func MaxBitsForType(typename string) (int, error) {
-	bitsByType, hazType := map[string]int{
-		"float64": 64, "int64": 64, "uint64": 64, "uint": 64, "int": 64,
-		"float32": 32, "int32": 32, "uint32": 32,
-		"int16": 16, "uint16": 16,
-		"int8": 8, "uint8": 8,
-		"bool": 1,
-	}[typename]
-	if !hazType {
-		return 0, fmt.Errorf("Unknown type %v", typename)
+func parseByTypenameToFloat64(s string, typename string) (float64, error) {
+	switch typename {
+	case "float64":
+		return strconv.ParseFloat(s, 64)
+	case "float32":
+		return strconv.ParseFloat(s, 32)
+	case "int":
+		i, errconst := strconv.ParseUint(s, 0, 32)
+		return float64(i), errconst
+	case "int8":
+		i, errconst := strconv.ParseUint(s, 0, 8)
+		return float64(i), errconst
+	case "int16":
+		i, errconst := strconv.ParseUint(s, 0, 16)
+		return float64(i), errconst
+	case "int32":
+		i, errconst := strconv.ParseUint(s, 0, 32)
+		return float64(i), errconst
+	case "int64":
+		i, errconst := strconv.ParseUint(s, 0, 64)
+		return float64(i), errconst
+	case "bool":
+		b, errconst := strconv.ParseBool(s)
+		if b {
+			return 1, errconst
+		}
+		return 0, errconst
+	default:
+		return 0, fmt.Errorf("trying set const to unknow typename %s", typename)
 	}
-	return bitsByType, nil
-}*/
+}
 
-func parseDirectives(tag string) (DirectiveSettings, error) {
+func hasOmit(tag string) bool {
+	maintokens := strings.Split(tag, ",")
+	for _, tok := range maintokens {
+		if tok == DIRECTIVEOMIT {
+			return true
+		}
+	}
+	return false
+}
+
+func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 	if len(tag) == 0 {
 		return DirectiveSettings{}, fmt.Errorf("No directives") //bool does not need directives. It is just bit
 	}
@@ -93,12 +124,22 @@ func parseDirectives(tag string) (DirectiveSettings, error) {
 			switch eqsplit[0] { //Too many
 			case DIRECTIVECLAMPED:
 				result.Clamped = true
+			case DIRECTIVEOMIT:
+				result.Omit = true
 			default:
 				return result, fmt.Errorf("invalid tag %v, unknown token %v", tag, tok)
 			}
 		}
 		if len(eqsplit) == 2 {
 			switch eqsplit[0] {
+			case DIRECTIVECONST:
+				result.Const = eqsplit[1]
+				//Check validity of constant
+				_, errconst := parseByTypenameToFloat64(result.Const, typename)
+				if errconst != nil {
+					return result, fmt.Errorf("type %v can not have constant %v, err=%v", typename, result.Const, errconst.Error())
+				}
+
 			case DIRECTIVEINFPOS:
 				f, ferr := strconv.ParseFloat(eqsplit[1], 64)
 				if ferr != nil {
@@ -178,12 +219,13 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 		return PiecewiseCoding{Name: name, Min: 0, Steps: []PiecewiseCodingStep{PiecewiseCodingStep{Size: 1, Count: 2}}, Clamped: true}, nil
 	}
 
-	dir, dirErr := parseDirectives(tag)
+	dir, dirErr := parseDirectives(tag, typename)
 	if dirErr != nil {
 		return PiecewiseCoding{}, fmt.Errorf("%v fail %v", name, dirErr.Error())
 	}
 
 	result := PiecewiseCoding{
+		Omit:    dir.Omit,
 		Name:    name,
 		Min:     dir.Min,
 		Steps:   dir.Steps,
@@ -194,6 +236,17 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 		InfNegDefined: dir.InfNegDefined,
 		InfPos:        dir.InfPos,
 		InfNeg:        dir.InfNeg,
+
+		//Const: dir.Const,
+	}
+
+	if 0 < len(dir.Const) {
+		var parseErr error
+		result.Const, parseErr = parseByTypenameToFloat64(dir.Const, typename)
+		if parseErr != nil {
+			return result, parseErr
+		}
+		result.ConstDefined = true
 	}
 
 	if 0 < len(result.Steps) {
@@ -231,11 +284,13 @@ func GetPiecewisesFromStruct(v interface{}) (PiecewiseFloats, error) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if field.Type.Name() != "" {
+
 			coding, codingErr := createPiecewiseCodingFromStruct(field.Name, field.Type.Name(), field.Tag.Get(SPLURTS))
 			if codingErr != nil {
 				return result, codingErr
 			}
 			result = append(result, coding)
+
 		}
 	}
 	return result, nil
@@ -292,6 +347,10 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 				return result, foundErr
 			}
 
+			if pw.Omit {
+				continue
+			}
+
 			switch f.Type().Name() {
 			case "float64", "float32":
 				result[name] = f.Float()
@@ -330,6 +389,9 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 			}
 			if pw.InfNegDefined && math.IsInf(f, -1) {
 				result[name] = pw.InfNeg
+			}
+			if pw.ConstDefined {
+				result[name] = pw.Const
 			}
 		}
 	}

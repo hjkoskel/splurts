@@ -13,6 +13,7 @@ import (
 
 //PiecewiseCoding  first implementation
 type PiecewiseCoding struct {
+	Omit    bool   //possible to disable
 	Name    string //Needed for floatStruct
 	Min     float64
 	Steps   []PiecewiseCodingStep
@@ -23,6 +24,9 @@ type PiecewiseCoding struct {
 	InfNegDefined bool
 	InfPos        float64
 	InfNeg        float64
+
+	Const        float64
+	ConstDefined bool
 }
 
 //Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
@@ -68,16 +72,6 @@ func (p *PiecewiseCoding) ToStringValue(f float64) (string, error) {
 	}
 	return p.Enums[n], nil
 }
-
-/*
-//Format string for printout
-func (p *PiecewiseCoding) FmtString() string {
-	if 0 < len(p.Steps) {
-		return "%s"
-	}
-	return fmt.Sprintf("%%.%vf", p.Decimals())
-}
-*/
 
 func (p PiecewiseCoding) String() string {
 	result := fmt.Sprintf("%v: (%v bits", p.Name, p.NumberOfBits())
@@ -151,6 +145,9 @@ func (p *PiecewiseCoding) TotalStepCount() uint64 {
 
 //NumberOfBits how many bits are spent
 func (p *PiecewiseCoding) NumberOfBits() int {
+	if p.Omit {
+		return 0
+	}
 	if 0 < len(p.Enums) {
 		return int(math.Ceil(math.Log2(float64(len(p.Enums) + 1))))
 	}
@@ -203,8 +200,13 @@ func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
 
 //BitCode is just wrapper for producing bit string representation from code
 func (p *PiecewiseCoding) BitCode(f float64) (string, error) {
+	var result string
 	formatstring := "%0" + fmt.Sprintf("%v", p.NumberOfBits()) + "b"
-	result := fmt.Sprintf(formatstring, p.ScaleToUint(f))
+	if p.ConstDefined {
+		result = fmt.Sprintf(formatstring, p.ScaleToUint(p.Const))
+	} else {
+		result = fmt.Sprintf(formatstring, p.ScaleToUint(f))
+	}
 	if len(result) != p.NumberOfBits() {
 		return "", fmt.Errorf("bit length %v does not match number of bits %v  (f=%v  piecewise=%#v actual maxCode=%v)\n", len(result), p.NumberOfBits(), f, p, p.MaxCode())
 	}
