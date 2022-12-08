@@ -110,6 +110,21 @@ It is possible to define struct variable to constant with directive **constant**
 
 This feature can be used when communication packets are 
 
+## Using time.Time
+
+Latest feature allows to use time.Time variables on struct. Time is stored in millisecond unix epoch format.
+User can limit step size (step=1000 means that only seconds are stored) and/or limit min and max values so less bits are consumed
+
+This is still experimental feature
+
+```go
+type TimeExampleStruct struct {
+	ExampleMetric float64   `splurts:"step=0.1,min=-40,max=40"`
+	CompleteTime  time.Time //nanosec spend 42bits
+	SecondTime    time.Time `splurts:"min=1670000000000,step=1000"` //uses 31 bits, ends at "Tue Apr 06 2106"
+}
+```
+
 # All cases example
 
 Following is collection of examples how to use splurts directives
@@ -153,12 +168,11 @@ func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []s
 
 # Incoming new features
 
-- const field support
-- omit field support, do not process that variable
 - support for time.Time conversion to binary format
 	- epoch time... timezones..precisions
 	- Bad... use epoch+bootcounter?
 	- relative time uses omited absolute field?
+- name directive support (usually user might want lower case variable name for export)
 - directives that link variables
 	- One variable is "errorOf" or timedelta of some other variable
 	- Variable is derived some other value (maybe not present) like there are can be
@@ -186,7 +200,7 @@ func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []s
 - plotdata export
 	- ranges based on maximum ranges of values
 	- time axis conversion (that is pain)
-- matlab export
-- protobuf like extraction/de-extraction code generation
+- matlab export code data+plots
+- protobuf like extraction/de-extraction code generation. OR data export
 	- golang, C, javascript, assemblyscript
 	- also data export to constant byte arrays

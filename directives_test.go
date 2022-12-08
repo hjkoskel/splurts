@@ -10,9 +10,36 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+type TimeExampleStruct struct {
+	ExampleMetric float64   `splurts:"step=0.1,min=-40,max=40"`
+	CompleteTime  time.Time //nanosec spend 42bits
+	SecondTime    time.Time `splurts:"min=1670000000000,step=1000"` //uses 31 bits, ends at "Tue Apr 06 2106"
+}
+
+func TestTime(t *testing.T) {
+	recipe, errRecipe := GetPiecewisesFromStruct(TimeExampleStruct{})
+	if errRecipe != nil {
+		t.Errorf("recipe error %v", errRecipe)
+	}
+
+	testTime := time.UnixMilli(1670523401643)
+	d := TimeExampleStruct{CompleteTime: testTime, SecondTime: testTime}
+	byt, errsplurt := recipe.Splurts(d)
+	assert.Equal(t, nil, errsplurt)
+
+	ref := TimeExampleStruct{}
+
+	errUnsplurt := recipe.UnSplurts(byt, &ref)
+	assert.Equal(t, nil, errUnsplurt)
+	assert.Equal(t, d.ExampleMetric, ref.ExampleMetric)
+	assert.Equal(t, d.CompleteTime, ref.CompleteTime)
+	assert.Equal(t, int64(1670523402000), ref.SecondTime.UnixMilli())
+}
 
 type ParticleMeas struct {
 	SystemStatus string  `splurts:"enum=UNDEFINED,INITIALIZE,IDLE,MEASURE,STOP,ERROR"`

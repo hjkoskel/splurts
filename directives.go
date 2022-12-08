@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //Keywords in struct
@@ -22,6 +23,11 @@ const (
 	DIRECTIVEINFNEG  = "infneg" //Override inf- value
 	DIRECTIVECONST   = "const"  //constant value, set when splurtsing to binary. Required when converting to binary
 	DIRECTIVEOMIT    = "omit"   //do not splurt or unsplurt this variable
+)
+
+const (
+	DEFAULT_MINEPOCHMS = 0 //1600000000000
+	DEFAULT_MAXEPOCHMS = 4300000000000
 )
 
 type DirectiveSettings struct { //For parsed
@@ -97,11 +103,24 @@ func hasOmit(tag string) bool {
 }
 
 func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
+	result := DirectiveSettings{}
+
+	if typename == "Time" {
+		//Lets set some good defaults
+		//result.Bits = 64
+		result.Step = 1.0
+		result.Clamped = true
+		result.Min = DEFAULT_MINEPOCHMS
+		result.Max = DEFAULT_MAXEPOCHMS
+		if len(tag) == 0 {
+			return result, nil //Ok to have no directives for time.Time
+		}
+	}
 	if len(tag) == 0 {
 		return DirectiveSettings{}, fmt.Errorf("No directives") //bool does not need directives. It is just bit
 	}
+
 	maintokens := strings.Split(tag, ",")
-	result := DirectiveSettings{}
 
 	//Default step is 1
 	result.Step = 1.0
@@ -324,6 +343,12 @@ func (p *PiecewiseFloats) setValuesFromFloatMap(v interface{}, values map[string
 						f.SetString(pw.Enums[index-1])
 					}
 				}
+			case "Time":
+				timeParsed := time.UnixMilli(int64(inputValue))
+				f.Set(reflect.ValueOf(timeParsed))
+
+			default:
+				return fmt.Errorf("unknown type %v", f.Type().Name())
 			}
 		}
 	}
@@ -381,6 +406,12 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 						return result, fmt.Errorf("Unknown enum %s for %s (valid enums are %#v)", stringvalue, name, pw.Enums)
 					}
 				}
+			case "Time":
+				timevalue := f.Interface().(time.Time)
+				//timevalue := reflect.ValueOf(f).Interface().(time.Time)
+				result[name] = float64(timevalue.UnixMilli()) //Lets use milliseconds for compatibility and overflow reasons with javascript
+			default:
+				return result, fmt.Errorf("unknown type %s at %v", f.Type().Name(), f)
 			}
 
 			f, _ := result[name]
