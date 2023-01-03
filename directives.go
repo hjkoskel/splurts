@@ -92,16 +92,6 @@ func parseByTypenameToFloat64(s string, typename string) (float64, error) {
 	}
 }
 
-func hasOmit(tag string) bool {
-	maintokens := strings.Split(tag, ",")
-	for _, tok := range maintokens {
-		if tok == DIRECTIVEOMIT {
-			return true
-		}
-	}
-	return false
-}
-
 func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 	result := DirectiveSettings{}
 
@@ -117,7 +107,7 @@ func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 		}
 	}
 	if len(tag) == 0 {
-		return DirectiveSettings{}, fmt.Errorf("No directives") //bool does not need directives. It is just bit
+		return DirectiveSettings{}, fmt.Errorf("no directives") //bool does not need directives. It is just bit
 	}
 
 	maintokens := strings.Split(tag, ",")
@@ -131,10 +121,12 @@ func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 		}
 
 		if eqsplit[0] == DIRECTIVEENUM {
-			result.Enums = maintokens[tokindex : len(maintokens)-1]
+			result.Enums = maintokens[tokindex:]
 			result.Enums[0] = strings.Replace(result.Enums[0], DIRECTIVEENUM, "", 1)
 			result.Enums[0] = strings.Replace(result.Enums[0], "=", "", 1)
-			result.Steps = []PiecewiseCodingStep{PiecewiseCodingStep{Size: 1, Count: uint64(len(result.Enums))}}
+			result.Steps = []PiecewiseCodingStep{
+				{Size: 1, Count: uint64(len(result.Enums))},
+			}
 			result.Clamped = true
 			return result, nil
 		}
@@ -235,7 +227,9 @@ func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 
 func createPiecewiseCodingFromStruct(name string, typename string, tag string) (PiecewiseCoding, error) {
 	if typename == "bool" { //Bool does not need any other directives
-		return PiecewiseCoding{Name: name, Min: 0, Steps: []PiecewiseCodingStep{PiecewiseCodingStep{Size: 1, Count: 2}}, Clamped: true}, nil
+		return PiecewiseCoding{Name: name, Min: 0, Steps: []PiecewiseCodingStep{
+			{Size: 1, Count: 2},
+		}, Clamped: true}, nil
 	}
 
 	dir, dirErr := parseDirectives(tag, typename)
@@ -355,7 +349,44 @@ func (p *PiecewiseFloats) setValuesFromFloatMap(v interface{}, values map[string
 	return nil
 }
 
-func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64, error) {
+func (p *PiecewiseFloats) GetValuesToFloatMapArr(v interface{}) (map[string][]float64, error) {
+	result := make(map[string][]float64)
+
+	rt := reflect.TypeOf(v)
+
+	switch rt.Kind() {
+	case reflect.Slice, reflect.Array:
+		vo := reflect.ValueOf(v)
+		count := vo.Len()
+		for i := 0; i < count; i++ {
+			item := vo.Index(i)
+			m, errm := p.GetValuesToFloatMapArr(item.Interface())
+			if errm != nil {
+				return result, errm
+			}
+			for name, varvalue := range m {
+				a, haz := result[name]
+				if haz {
+					a = append(a, varvalue...)
+					result[name] = a
+				} else {
+					result[name] = varvalue
+				}
+			}
+		}
+	case reflect.Struct:
+		m, errm := p.GetValuesToFloatMap(v)
+		if errm != nil {
+			return nil, errm
+		}
+		for name, varvalue := range m {
+			result[name] = []float64{varvalue}
+		}
+	}
+	return result, nil
+}
+
+func (p *PiecewiseFloats) GetValuesToFloatMap(v interface{}) (map[string]float64, error) {
 	result := make(map[string]float64)
 	elem := reflect.ValueOf(v)
 	typeOfS := elem.Type()
@@ -403,7 +434,7 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 						}
 					}
 					if !found {
-						return result, fmt.Errorf("Unknown enum %s for %s (valid enums are %#v)", stringvalue, name, pw.Enums)
+						return result, fmt.Errorf("unknown enum %s for %s (valid enums are %#v)", stringvalue, name, pw.Enums)
 					}
 				}
 			case "Time":
@@ -414,7 +445,7 @@ func (p *PiecewiseFloats) getValuesToFloatMap(v interface{}) (map[string]float64
 				return result, fmt.Errorf("unknown type %s at %v", f.Type().Name(), f)
 			}
 
-			f, _ := result[name]
+			f := result[name]
 			if pw.InfPosDefined && math.IsInf(f, 1) {
 				result[name] = pw.InfPos
 			}
@@ -456,19 +487,19 @@ func (p *PiecewiseFloats) UnSplurts7bitBytes(raw SevenBitArr, output interface{}
 
 //Splurts data to bytes  Get piecewiseFloatStruct by calling GetPiecewisesFromStruct
 func (p *PiecewiseFloats) Splurts(input interface{}) ([]byte, error) {
-	m, e := p.getValuesToFloatMap(input)
+	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
 		return []byte{}, e
 	}
 	result, errEncode := p.Encode(m)
 	if errEncode != nil {
-		return result, fmt.Errorf("Encoding error %v", errEncode.Error())
+		return result, fmt.Errorf("encoding error %v", errEncode.Error())
 	}
 	return result, nil
 }
 
 func (p *PiecewiseFloats) SplurtsHex(input interface{}) (string, error) {
-	m, e := p.getValuesToFloatMap(input)
+	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
 		return "", e
 	}
@@ -476,7 +507,7 @@ func (p *PiecewiseFloats) SplurtsHex(input interface{}) (string, error) {
 }
 
 func (p *PiecewiseFloats) SplurtsHexNybble(input interface{}) (string, error) {
-	m, e := p.getValuesToFloatMap(input)
+	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
 		return "", e
 	}
@@ -484,7 +515,7 @@ func (p *PiecewiseFloats) SplurtsHexNybble(input interface{}) (string, error) {
 }
 
 func (p *PiecewiseFloats) Splurts7bitBytes(input interface{}) (SevenBitArr, error) {
-	m, e := p.getValuesToFloatMap(input)
+	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
 		return nil, e
 	}
@@ -494,7 +525,7 @@ func (p *PiecewiseFloats) Splurts7bitBytes(input interface{}) (SevenBitArr, erro
 //ToStrings writes values with required number of decimals and enums in string format
 func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]string, error) {
 	result := make(map[string]string)
-	m, e := p.getValuesToFloatMap(input)
+	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
 		return nil, e
 	}

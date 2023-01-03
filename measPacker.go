@@ -67,12 +67,16 @@ func (p *PiecewiseFloats) DecodeHex(hexString string, allowNaN bool) (map[string
 	return p.Decode(binarr, allowNaN)
 }
 
+func (p *PiecewiseFloats) NumberOfBytes() int {
+	return int(math.Ceil(float64(p.NumberOfBits()) / 8.0))
+}
+
 //Decode codes byte array to float value map.   If values are missing and allowNaN is true. Skip or replace with NaN on map
 func (p *PiecewiseFloats) Decode(binarr []byte, allowNaN bool) (map[string]float64, error) {
-	if int(math.Ceil(float64(p.NumberOfBits())/8.0)) != len(binarr) {
+	if p.NumberOfBytes() != len(binarr) {
 		return nil, fmt.Errorf("Struct have %v bits means %v bytes. BUT binary array have %v bytes",
 			p.NumberOfBits(),
-			int(math.Ceil(float64(p.NumberOfBits())/8.0)),
+			p.NumberOfBytes(),
 			len(binarr))
 	}
 

@@ -165,6 +165,14 @@ Values like +Inf and -Inf can be avoided by setting **infpos** and **infneg** on
 ```go
 func (p *PiecewiseFloats) ToCsv(input interface{}, separator string, columns []string, skipNaNRows bool) (string, error) {
 ```
+# Messagepack
+
+Experimental feature:
+
+- *SplurtsArrToMessagepack(* creates message pack formatted binary from array of splurts structs.
+- *ReadMsgPackMetrics(* reads back message pack struct
+
+Check messagepack/messagepack_test.go as example. Later there will be code for extracting messagepacked metrics for different languages
 
 # Incoming new features
 

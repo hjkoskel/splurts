@@ -54,6 +54,39 @@ type ParticleMeas struct {
 	Emptyvalue   string  `splurts:"enum=NO,MAYBE,YES"`
 }
 
+func TestArrayOfStructsValue(t *testing.T) {
+	testArr := []ParticleMeas{
+		{SystemStatus: "IDLE", Temperature: 22.1, Humidity: 32.4, Pressure: 95200, Small: 69.42, Large: 33, Extra: 2, Heater: false, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.2, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "STOP", Temperature: 22.3, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: false, Emptyvalue: "YES"},
+	}
+
+	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
+	if errRecipe != nil {
+		t.Errorf("Recipe error %v", errRecipe)
+	}
+
+	m, mErr := recipe.GetValuesToFloatMapArr(testArr)
+	if mErr != nil {
+		t.Errorf("map err %v", mErr.Error())
+	}
+
+	var wanted = map[string][]float64{
+		"Emptyvalue":   {3, 3, 3},
+		"Extra":        {2, 3, 3},
+		"Heater":       {0, 1, 0},
+		"Humidity":     {32.4, 32.6, 32.6},
+		"Large":        {33, 34, 34},
+		"Pressure":     {95200, 95100, 95100},
+		"Small":        {69.42, 67.11, 67.11},
+		"StaticSymbol": {42, 42, 42},
+		"SystemStatus": {3, 4, 5},
+		"Temperature":  {22.1, 22.2, 22.3}}
+
+	assert.Equal(t, wanted, m)
+
+}
+
 func TestNotMatchingConst(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
 	if errRecipe != nil {
@@ -577,7 +610,6 @@ func TestCsv(t *testing.T) {
 	arr = append(arr, meas1)
 
 	txt, errCsv := recipe.ToCsv(arr, "\t", []string{}, true)
-	//txt, errCsv := recipe.ToCsv(meas1, "\t", []string{})
 	assert.Equal(t, nil, errCsv)
 	assert.Equal(t, "STOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t3.0\t42\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
 

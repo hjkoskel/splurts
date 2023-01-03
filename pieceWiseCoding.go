@@ -29,10 +29,9 @@ type PiecewiseCoding struct {
 	ConstDefined bool
 }
 
-//Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
-func (p *PiecewiseCoding) Decimals() int {
+func (p *PiecewiseCoding) MinStep() float64 {
 	if 0 < len(p.Enums) {
-		return 0
+		return 1
 	}
 	if len(p.Steps) == 0 {
 		return 0
@@ -41,9 +40,27 @@ func (p *PiecewiseCoding) Decimals() int {
 	for _, step := range p.Steps {
 		minStep = math.Min(minStep, math.Abs(step.Size))
 	}
+	return minStep
+}
+
+//Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
+func (p *PiecewiseCoding) Decimals() int {
+	if 0 < len(p.Enums) {
+		return 0
+	}
+	if len(p.Steps) == 0 {
+		return 0
+	}
+	/*	minStep := math.Abs(p.Steps[0].Size)
+		for _, step := range p.Steps {
+			minStep = math.Min(minStep, math.Abs(step.Size))
+		}
+	*/
+	minStep := p.MinStep()
 	if 1 < minStep {
 		return 0
 	}
+
 	return int(math.Ceil(math.Abs(math.Log10(minStep))))
 }
 
@@ -68,7 +85,7 @@ func (p *PiecewiseCoding) ToStringValue(f float64) (string, error) {
 		return "", nil //First is empty string
 	}
 	if len(p.Enums) < n || n < 0 {
-		return "", fmt.Errorf("Have %v enums+empty, index is %v", len(p.Enums), n)
+		return "", fmt.Errorf("have %v enums+empty, index is %v", len(p.Enums), n)
 	}
 	return p.Enums[n], nil
 }
