@@ -87,7 +87,7 @@ func (p *PiecewiseCoding) ToStringValue(f float64) (string, error) {
 	if len(p.Enums) < n || n < 0 {
 		return "", fmt.Errorf("have %v enums+empty, index is %v", len(p.Enums), n)
 	}
-	return p.Enums[n], nil
+	return p.Enums[n-1], nil
 }
 
 func (p PiecewiseCoding) String() string {

@@ -236,6 +236,7 @@ func (p *MsgPackMetricArr) AllValues() ([]float64, error) { //Crude way to just 
 	if errArr != nil {
 		return nil, errArr
 	}
+
 	result := make([]float64, len(regarr))
 	var err error
 	for i, reg := range regarr {

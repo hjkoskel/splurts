@@ -102,7 +102,7 @@ func (p *DeltaRLEVec) ToArr(deltas int) ([]int64, error) {
 		return nil, unpackerr
 	}
 
-	for d := 0; d <= deltas; d++ {
+	for d := 0; d < deltas; d++ {
 		unpacked = UnDeltaVec(unpacked)
 	}
 

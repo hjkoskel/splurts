@@ -119,7 +119,7 @@ func TestStringConversion(t *testing.T) {
 	testString, _ := recipe.ToStrings(d, true)
 	v, haz := testString["SystemStatus"]
 	assert.Equal(t, true, haz)
-	assert.Equal(t, "\"STOP\"", v)
+	assert.Equal(t, "\"MEASURE\"", v)
 	v, haz = testString["Temperature"]
 	assert.Equal(t, true, haz)
 	assert.Equal(t, "-40.1", v)
@@ -583,7 +583,6 @@ func TestInvalidInfConf(t *testing.T) {
 	_, errInf := GetPiecewisesFromStruct(InvalidInfStruct{})
 	assert.NotEqual(t, nil, errInf)
 }
-
 func TestCsv(t *testing.T) {
 	recipe, errRecipe := GetPiecewisesFromStruct(ParticleMeas{})
 	assert.Equal(t, nil, errRecipe)
@@ -611,7 +610,7 @@ func TestCsv(t *testing.T) {
 
 	txt, errCsv := recipe.ToCsv(arr, "\t", []string{}, true)
 	assert.Equal(t, nil, errCsv)
-	assert.Equal(t, "STOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nSTOP\t3.0\t42\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nSTOP\t5.0\t42\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
+	assert.Equal(t, "MEASURE\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nMEASURE\t-40.1\t42\t110.13\t80001\t301.2\t0.0\t2.1\t0\nMEASURE\t3.0\t42\t110.13\t80001\t301.2\t99999.0\t2.1\t0\nMEASURE\t5.0\t42\t110.13\t80001\t301.2\t-99999.0\t2.1\t0\nMEASURE\t5.0\t42\t110.13\t80001\t+Inf\t0.0\t2.1\t0\n", txt)
 
 	txtTempHum, errTempHum := recipe.ToCsv(arr, "\t", []string{"Temperature", "Humidity"}, true)
 	assert.Equal(t, nil, errTempHum)

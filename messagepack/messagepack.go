@@ -23,8 +23,8 @@ Code piecewise by piecewise. Avoid memory peak consumption
 
 const (
 	MPNAME_CODING         = "coding"
-	MPNAME_CODING_MIN     = "MIN"
-	MPNAME_CODING_MAX     = "MAX"
+	MPNAME_CODING_MIN     = "min"
+	MPNAME_CODING_MAX     = "max"
 	MPNAME_CODING_CLAMPED = "cla"
 
 	MPNAME_ENUMS = "enums"
@@ -187,19 +187,9 @@ func WriteSplurtsVariableArr(b *bytes.Buffer, p splurts.PiecewiseCoding, rleLimi
 		return fmt.Errorf("number of deltas %v not supported", deltas)
 	}
 
-	for d := 0; d <= deltas; d++ {
+	for d := 0; d < deltas; d++ {
 		arrInt64 = DeltaVec(arrInt64)
 	}
-
-	/*
-		if deltas == 2 {
-			arrInt64 = DeltaVec(arrInt64) //Delta can be negative
-		}
-
-		if deltas == 1 {
-			arrInt64 = DeltaVec(arrInt64)
-		}
-	*/
 
 	return ArrToRLEMessagepack(b, arrInt64, int64(rleLimit))
 }
