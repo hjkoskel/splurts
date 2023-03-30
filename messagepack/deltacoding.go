@@ -2,13 +2,7 @@
 Functions for creating delta coding in messagepack integer vector.
 Int does not introduce rounding error
 
-Supports two levels
-
--Start and then deltas
--Startvalue, initial delta and then deltas of delta
-
-Also RLE packing after repeating values
-
+Supports two levels of delta encoding
 */
 package messagepack
 
@@ -19,13 +13,28 @@ import (
 	"io"
 )
 
-//Keep messagepack format in memory... search etc... then write just append that to messagepack
+// Keep messagepack format in memory... search etc... then write just append that to messagepack
 type DeltaRLEVec []byte
+
+func CreateDeltaRLEVec(inputArr []int64, deltas int, rleLimit int) (DeltaRLEVec, error) {
+	for d := 0; d < deltas; d++ {
+		inputArr = DeltaVec(inputArr)
+	}
+	b := new(bytes.Buffer)
+	rleWriteErr := ArrToMessagepack(b, inputArr)
+	if rleWriteErr != nil {
+		return nil, rleWriteErr
+	}
+	return b.Bytes(), nil
+}
 
 func ReadDeltaRLEVec(buf io.Reader) (DeltaRLEVec, error) {
 	n, errN := ReadArr(buf) //Number of elements. can be numbers or actual
 	if errN != nil {
 		return nil, errN
+	}
+	if n == 0 {
+		return nil, nil
 	}
 
 	result := new(bytes.Buffer)
@@ -44,7 +53,6 @@ func ReadDeltaRLEVec(buf io.Reader) (DeltaRLEVec, error) {
 		}
 
 		if IsArr(first) {
-			//fmt.Printf("first is arr\n")
 			is2, is2err := ReadArrWithFirst(buf, first)
 			if is2err != nil {
 				return nil, is2err
@@ -110,6 +118,12 @@ func (p *DeltaRLEVec) ToArr(deltas int) ([]int64, error) {
 }
 
 func (p *DeltaRLEVec) WriteToBuf(buf *bytes.Buffer) error {
+	if *p == nil {
+		return WriteNil(buf)
+	}
+	if len(*p) == 0 {
+		return WriteNil(buf)
+	}
 	_, e := buf.Write(*p)
 	return e
 }

@@ -11,7 +11,7 @@ import (
 	"strconv"
 )
 
-//PiecewiseCoding  first implementation
+// PiecewiseCoding  first implementation
 type PiecewiseCoding struct {
 	Omit    bool   //possible to disable
 	Name    string //Needed for floatStruct
@@ -27,6 +27,7 @@ type PiecewiseCoding struct {
 
 	Const        float64
 	ConstDefined bool
+	Meta         DirectiveMetadata
 }
 
 func (p *PiecewiseCoding) MinStep() float64 {
@@ -43,7 +44,7 @@ func (p *PiecewiseCoding) MinStep() float64 {
 	return minStep
 }
 
-//Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
+// Decimals Tells how many decimals are required for float. 0=integer 1=0.1 2=0.2
 func (p *PiecewiseCoding) Decimals() int {
 	if 0 < len(p.Enums) {
 		return 0
@@ -78,7 +79,6 @@ func (p *PiecewiseCoding) ToStringValue(f float64) (string, error) {
 			return fmt.Sprintf(formatstring, float64(0)), nil
 		}
 		return s, nil
-
 	}
 	n := int(f)
 	if n == 0 {
@@ -105,18 +105,18 @@ func (p PiecewiseCoding) String() string {
 	return result
 }
 
-//PiecewiseCodingStep size and count  (linter wants comment)
+// PiecewiseCodingStep size and count  (linter wants comment)
 type PiecewiseCodingStep struct {
 	Size  float64
 	Count uint64
 }
 
-//String stringer function for debug printing
+// String stringer function for debug printing
 func (p PiecewiseCodingStep) String() string {
 	return fmt.Sprintf("%v*%vsteps", p.Size, p.Count)
 }
 
-//Max helper function
+// Max helper function
 func (p *PiecewiseCoding) Max() float64 {
 	result := p.Min
 	for _, step := range p.Steps {
@@ -125,7 +125,7 @@ func (p *PiecewiseCoding) Max() float64 {
 	return result
 }
 
-//IsInvalid Validity checkup.
+// IsInvalid Validity checkup.
 func (p *PiecewiseCoding) IsInvalid() error {
 	if len(p.Name) == 0 {
 		return fmt.Errorf("name missing")
@@ -148,7 +148,7 @@ func (p *PiecewiseCoding) IsInvalid() error {
 	return nil
 }
 
-//TotalStepCount helper function
+// TotalStepCount helper function
 func (p *PiecewiseCoding) TotalStepCount() uint64 {
 	if 0 < len(p.Enums) {
 		return uint64(len(p.Enums)) + 1
@@ -160,7 +160,7 @@ func (p *PiecewiseCoding) TotalStepCount() uint64 {
 	return n
 }
 
-//NumberOfBits how many bits are spent
+// NumberOfBits how many bits are spent
 func (p *PiecewiseCoding) NumberOfBits() int {
 	if p.Omit {
 		return 0
@@ -176,12 +176,32 @@ func (p *PiecewiseCoding) NumberOfBits() int {
 	return int(math.Ceil(math.Log2(float64(n + 3))))
 }
 
-//MaxCode Maximum code possible.
+// MaxCode Maximum code possible.
 func (p *PiecewiseCoding) MaxCode() uint64 {
 	return uint64(math.Pow(2, float64(p.NumberOfBits())) - 1)
 }
 
-//ScaleToUint converts float to step number.
+// Scales float array to uint64 array. TODO optimize for array operation later
+func (p *PiecewiseCoding) ScaleToUintArr(fArr []float64) []uint64 {
+	//naive solution
+	result := make([]uint64, len(fArr))
+	for i, f := range fArr {
+		result[i] = p.ScaleToUint(f)
+	}
+	return result
+}
+
+// Scales float array to int64 array. TODO optimize for array operation later
+func (p *PiecewiseCoding) ScaleToIntArr(fArr []float64) []int64 {
+	//naive solution
+	result := make([]int64, len(fArr))
+	for i, f := range fArr {
+		result[i] = int64(p.ScaleToUint(f))
+	}
+	return result
+}
+
+// ScaleToUint converts float to step number.
 func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
 
 	if 0 < len(p.Enums) {
@@ -215,7 +235,7 @@ func (p *PiecewiseCoding) ScaleToUint(f float64) uint64 {
 	return maxcode - 1
 }
 
-//BitCode is just wrapper for producing bit string representation from code
+// BitCode is just wrapper for producing bit string representation from code
 func (p *PiecewiseCoding) BitCode(f float64) (string, error) {
 	var result string
 	formatstring := "%0" + fmt.Sprintf("%v", p.NumberOfBits()) + "b"
@@ -230,7 +250,7 @@ func (p *PiecewiseCoding) BitCode(f float64) (string, error) {
 	return result, nil
 }
 
-//HexCode to hex code,
+// HexCode to hex code,
 func (p *PiecewiseCoding) HexCode(f float64) string {
 	numberOfHexChars := int(math.Ceil(float64(p.NumberOfBits()) / 4))
 	//Even number
@@ -255,7 +275,7 @@ func (p *PiecewiseCoding) HexCodeMax() string {
 	return result
 }
 
-//ScaleToFloat scales unsigned integer presentation to actual measurement float
+// ScaleToFloat scales unsigned integer presentation to actual measurement float
 func (p *PiecewiseCoding) ScaleToFloat(v uint64) float64 {
 	maxv := p.MaxCode()
 	if !p.Clamped {

@@ -1,7 +1,7 @@
 /*
 Raw messagepack functions
 
-Just minimal
+# Just minimal
 
 For starting map and array:
 func WriteFixmap(buf *bytes.Buffer, n int) error {
@@ -11,7 +11,6 @@ For adding variables (intelligent way)
 func WriteString(buf *bytes.Buffer, s string) error {
 func WriteBool(buf *bytes.Buffer, value bool) error {
 func WriteNumber(buf *bytes.Buffer, f float64, maxErr float64) error {
-
 */
 package messagepack
 
@@ -37,20 +36,25 @@ func ReadString(buf io.Reader) (string, error) {
 		return "", firstErr
 	}
 
-	if first < 0xa0 || 0xbf < first {
-		return "", fmt.Errorf("is not string")
+	if first == 0xc0 { //NIL
+		return "", nil
 	}
-	var n uint32
-	if first&0xF0 == 0xA0 {
-		n = uint32(first & 0xF)
+
+	/*if (first < 0xa0 || 0xbf < first) && first != 0x9d {
+		return "", fmt.Errorf("is not string 0x%X", first)
+	}*/
+	var n int64
+	n = -1
+	if first&0xE0 == 0xA0 {
+		n = int64(uint32(first & 0xF))
 	}
-	if first == 0x9d {
+	if first == 0xd9 {
 		var u8 uint8
 		readErr := binary.Read(buf, binary.BigEndian, &u8)
 		if readErr != nil {
 			return "", readErr
 		}
-		n = uint32(u8)
+		n = int64(u8)
 	}
 	if first == 0xda {
 		var u16 uint16
@@ -58,7 +62,21 @@ func ReadString(buf io.Reader) (string, error) {
 		if readErr != nil {
 			return "", readErr
 		}
+		n = int64(u16)
 	}
+	if first == 0xdb {
+		var u32 uint32
+		readErr := binary.Read(buf, binary.BigEndian, &u32)
+		if readErr != nil {
+			return "", readErr
+		}
+		n = int64(u32)
+	}
+
+	if n < 0 {
+		return "", fmt.Errorf("is not string 0x%X", first)
+	}
+
 	s := make([]byte, n)
 	_, readErr := io.ReadFull(buf, s)
 	return string(s), readErr
@@ -73,6 +91,10 @@ func ReadFixmap(buf io.Reader) (uint32, error) {
 	errFirst := binary.Read(buf, binary.BigEndian, &first)
 	if errFirst != nil {
 		return 0, errFirst
+	}
+
+	if first == 0xc0 { //NIL
+		return 0, nil
 	}
 
 	if !IsFixmap(first) {
@@ -97,9 +119,11 @@ func IsArr(first byte) bool {
 }
 
 func ReadArrWithFirst(buf io.Reader, first byte) (uint32, error) { //Just read how many and how long after
+	if first == 0xc0 { //NIL
+		return 0, nil
+	}
 	if !IsArr(first) {
 		return 0, fmt.Errorf("invalid arr start %X", first)
-
 	}
 	if first&0xF0 == 0x90 {
 		return uint32(first & 0x0F), nil
@@ -171,6 +195,43 @@ func ReadNumberWithFirst(buf io.Reader, first byte) (float64, error) {
 	return float64(i), nil
 }
 
+func ReadBinArray(buf io.Reader) ([]byte, error) {
+	var first byte
+	errFirst := binary.Read(buf, binary.BigEndian, &first)
+	if errFirst != nil {
+		return nil, errFirst
+	}
+	return ReadBinArrayWithFirst(buf, first)
+}
+
+func ReadBinArrayWithFirst(buf io.Reader, first byte) ([]byte, error) {
+	var result []byte
+	switch first {
+	case 0xc4:
+		var u8 uint8
+		if err := binary.Read(buf, binary.BigEndian, &u8); err != nil {
+			return nil, err
+		}
+		result = make([]byte, u8)
+	case 0xc5:
+		var u16 uint16
+		if err := binary.Read(buf, binary.BigEndian, &u16); err != nil {
+			return nil, err
+		}
+		result = make([]byte, u16)
+	case 0xc6:
+		var u32 uint32
+		if err := binary.Read(buf, binary.BigEndian, &u32); err != nil {
+			return nil, err
+		}
+		result = make([]byte, u32)
+	default:
+		return nil, fmt.Errorf("invalid first byte 0x%X for binarr", first)
+	}
+	_, err := buf.Read(result)
+	return result, err
+}
+
 func ReadInt(buf io.Reader) (int64, error) {
 	var first byte
 	errFirst := binary.Read(buf, binary.BigEndian, &first)
@@ -180,7 +241,7 @@ func ReadInt(buf io.Reader) (int64, error) {
 	return ReadIntWithFirst(buf, first)
 }
 
-//Read signed int... gives byte that was already read out
+// Read signed int... gives byte that was already read out
 func ReadIntWithFirst(buf io.Reader, first byte) (int64, error) {
 	if first&0x80 == 0 { //pos integer 8bit
 		return int64(first), nil
@@ -205,7 +266,7 @@ func ReadIntWithFirst(buf io.Reader, first byte) (int64, error) {
 	case 0xcf:
 		var u64 uint64
 		readErr := binary.Read(buf, binary.BigEndian, &u64)
-		return int64(u64), readErr //TODO error if goes over signed 64
+		return int64(u64), readErr //TODO error if goes over signed 64. TODO make custom function
 		//return 0, 0, fmt.Errorf("use unsigned read for uint64")
 	case 0xd0:
 		var i8 int8

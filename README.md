@@ -174,6 +174,15 @@ Experimental feature:
 
 Check messagepack/messagepack_test.go as example. Later there will be code for extracting messagepacked metrics for different languages
 
+# Splurt library explained by chatGTP
+The text you've provided describes a library that is designed to efficiently store and transmit measurement data in a binary format. The library is intended to be used in systems where multiple metrics are being measured, and where the range and precision of those metrics are known.
+
+The library is designed to take advantage of the fact that different metrics will have different ranges and precisions, and to use only the number of bits that are necessary to represent each metric. For example, if a metric has a range of 0 to 2.5 volts, and an ADC with 10-bit resolution is used to measure that metric, the library will only use 10 bits to represent the measurement value.
+
+The library also provides functions for encoding and decoding the binary data, and allows for the storage of special values such as NaN, Inf, and -Inf, when the measured value is outside of the range. This feature can be critical in situations such as radiation measurement where it is important to know when a value exceeds the measurement range.
+
+Additionally, the library allows handling with clamping of values and NaN during decoding and packing it in a byte array. And also compressing it to reduce bytes used.
+
 # Incoming new features
 
 - support for time.Time conversion to binary format
@@ -190,6 +199,7 @@ Check messagepack/messagepack_test.go as example. Later there will be code for e
 - physics related directives for plots and reporting
 	- *precision* directive for constant precision (how tightly packed, how many decimals in text printout, error bars etc..) Overrides stepsize for presentation
 		- TODO absolute vs percent
+		- Comes from stepsize
 	- accuracy directive, realistic or tells how much meaningful decimals there are  (not actual use yet, but reserve directive). OR give plusminus symbol to printout.
 		- TODO absolute vs percent!!
 	- Unit, SI-units and derivates

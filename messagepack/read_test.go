@@ -1,4 +1,4 @@
-//messagepackRaw_test.go
+// messagepackRaw_test.go
 package messagepack
 
 import (
@@ -64,4 +64,48 @@ func TestIntReads(t *testing.T) {
 	assert.Equal(t, nil, e)
 	assert.Equal(t, int64(12345678901), i)
 
+}
+
+func TestStringReadWrites(t *testing.T) {
+
+	testStrings := []string{
+		"a",
+		"abc",
+		"lorem ipsum",
+		"fasdfasdfsdafsadfsadfasdfsadfasdfsadsadfasdf",
+		"sadfffffffffffffffffffffffffffffsafsdfsdfsdfsadfsadgadhfghfghfhfghfhklsajdflkjsdakfjskldjfklsdjfklsjdklfjsd",
+		"",
+	}
+
+	for _, s := range testStrings {
+		b := new(bytes.Buffer)
+		e := WriteString(b, s)
+		assert.Equal(t, nil, e)
+		code := b.Bytes()
+
+		ref, refErr := ReadString(bytes.NewBuffer(code))
+		assert.Equal(t, nil, refErr)
+		assert.Equal(t, ref, s)
+	}
+}
+
+func TestBinArr(t *testing.T) {
+	testArrays := make([][]byte, 3)
+	testArrays[0] = make([]byte, 100)
+	testArrays[0][6] = 1
+	testArrays[1] = make([]byte, 1000)
+	testArrays[1][100] = 2
+	testArrays[2] = make([]byte, 70000)
+	testArrays[2][6000] = 3
+
+	for _, arr := range testArrays {
+		b := new(bytes.Buffer)
+		e := WriteBinArray(b, arr)
+		assert.Equal(t, nil, e)
+		code := b.Bytes()
+		//ReadBinArrayWithFirst
+		ref, refErr := ReadBinArray(bytes.NewBuffer(code))
+		assert.Equal(t, nil, refErr)
+		assert.Equal(t, ref, arr)
+	}
 }

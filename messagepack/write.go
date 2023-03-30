@@ -13,6 +13,7 @@ import (
 	"math"
 )
 
+// WriteBool writes bool value to buffer
 func WriteBool(buf *bytes.Buffer, value bool) error {
 	if value {
 		return buf.WriteByte(0xc3)
@@ -34,7 +35,6 @@ func WriteNumber(buf *bytes.Buffer, f float64, maxErr float64) error {
 }
 
 func WriteInt(buf *bytes.Buffer, i int64) error {
-
 	//Use unsigned if positive? better compression?  Messagepack is a little stupid?
 	if 0 <= i {
 		return writeUInt(buf, uint64(i))
@@ -73,9 +73,6 @@ func WriteInt(buf *bytes.Buffer, i int64) error {
 }
 
 func WriteArray(buf *bytes.Buffer, n uint32) error {
-	if n < 0 {
-		return fmt.Errorf("Invalid number")
-	}
 	if 0xFFFFFFF < n {
 		return fmt.Errorf("too many")
 	}
@@ -99,9 +96,6 @@ func WriteArray(buf *bytes.Buffer, n uint32) error {
 }
 
 func WriteFixmap(buf *bytes.Buffer, n uint32) error {
-	if n < 0 {
-		return fmt.Errorf("Invalid number")
-	}
 	if 0xFFFFFFF < n {
 		return fmt.Errorf("too many")
 	}
@@ -122,6 +116,24 @@ func WriteFixmap(buf *bytes.Buffer, n uint32) error {
 		return e
 	}
 	return binary.Write(buf, binary.BigEndian, uint32(n))
+}
+
+func WriteStringMapString(buf *bytes.Buffer, m map[string]string) error {
+	for name, value := range m {
+		err := WriteString(buf, name)
+		if err != nil {
+			return err
+		}
+		err = WriteString(buf, value)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func WriteNil(buf *bytes.Buffer) error {
+	return buf.WriteByte(0xc0)
 }
 
 func WriteString(buf *bytes.Buffer, s string) error { //TODO only 8 bit chars... or?
@@ -168,7 +180,7 @@ func WriteString(buf *bytes.Buffer, s string) error { //TODO only 8 bit chars...
 	return e
 }
 
-//Low level
+// Low level
 func writeFloat64(buf *bytes.Buffer, f float64) error {
 	e := buf.WriteByte(0xcb)
 	if e != nil {
@@ -217,4 +229,40 @@ func writeFloat32(buf *bytes.Buffer, f float32) error {
 		return e
 	}
 	return binary.Write(buf, binary.BigEndian, f)
+}
+
+func WriteBinArray(buf *bytes.Buffer, data []byte) error {
+	n := len(data)
+	if n <= 0xFF {
+		err := buf.WriteByte(0xc4)
+		if err != nil {
+			return err
+		}
+		err = buf.WriteByte(byte(n))
+		if err != nil {
+			return err
+		}
+	} else {
+		if n <= 0xFFFF {
+			err := buf.WriteByte(0xc5)
+			if err != nil {
+				return err
+			}
+			err = binary.Write(buf, binary.BigEndian, uint16(n))
+			if err != nil {
+				return err
+			}
+		} else {
+			err := buf.WriteByte(0xc6)
+			if err != nil {
+				return err
+			}
+			err = binary.Write(buf, binary.BigEndian, uint32(n))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	_, err := buf.Write(data)
+	return err
 }

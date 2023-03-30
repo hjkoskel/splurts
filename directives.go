@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-//Keywords in struct
+// Keywords in struct. Fixed, based on what kind hardware measures and where
 const (
 	SPLURTS          = "splurts"
 	DIRECTIVECLAMPED = "clamped"
@@ -23,12 +23,35 @@ const (
 	DIRECTIVEINFNEG  = "infneg" //Override inf- value
 	DIRECTIVECONST   = "const"  //constant value, set when splurtsing to binary. Required when converting to binary
 	DIRECTIVEOMIT    = "omit"   //do not splurt or unsplurt this variable
+
+	DIRECTIVE_META_UNIT    = "unit"    //Unit like kg. Used when plotting and grouping "compatible" metrics together
+	DIRECTIVE_META_CAPTION = "caption" //Caption for this metric, optional. Printable text without unit
+	//DIRECTIVE_META_THING       = "thing"       //What thing this measures  "ambient", "gas", "oil"...  "inlet","cell" etc.. for grouping
+	DIRECTIVE_META_ACCURACY    = "accuracy"    //Numerical value or string pointing to other field by name Plus minus value
+	DIRECTIVE_META_MAXINTERVAL = "maxinterval" //During data loggin time NaN are indication that data is missing. This limit tells that it is declared faulty measurement instead of slower rate
+	DIRECTIVE_META_BANDWIDTH   = "bandwidth"
 )
 
 const (
 	DEFAULT_MINEPOCHMS = 0 //1600000000000
 	DEFAULT_MAXEPOCHMS = 4300000000000
 )
+
+type DirectiveMetadata struct { //Metadata for plotting, printing, reporting, exporting etc... Not directly for computing values
+	Unit    string
+	Caption string
+	// Thing    string NOT YET, think about this
+	Accuracy string //Value or metric name
+
+	//Interpolation allowed? If not then step...  linear?  spline
+	//NOT YET, think about thisNoInterpolate bool //true.. means that actually this updates when it says so. And guessing values in between is bad by default
+
+	//TODO RLE coding with extra parameter telling how many real updates!
+	//NOT YET, think about this MinInterval time.Duration //Nanosec duration what is smallest sampling rate... PARSED FROM STRING  h,min,s,ms
+	//NOT YET, think about this Interval    time.Duration //Norminal interval, what should be
+	MaxInterval time.Duration //Nanosec duration how long before line cuts in time series when there are NaNs. If not defined NaN terminates immediately
+	Bandwidth   float64       //-3dB point, see how fast transients are possible to catch. Is
+}
 
 type DirectiveSettings struct { //For parsed
 	Omit    bool
@@ -49,6 +72,8 @@ type DirectiveSettings struct { //For parsed
 
 	Enums []string
 	Const string
+
+	Meta DirectiveMetadata
 }
 
 // StepCount, if can not calc then 0
@@ -213,6 +238,20 @@ func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 					}
 					result.Steps = append(result.Steps, PiecewiseCodingStep{Size: stepSize, Count: uint64(stepCount)})
 				}
+			case DIRECTIVE_META_UNIT: // = "unit"         //Unit like kg. Used when plotting and grouping "compatible" metrics together
+				result.Meta.Unit = eqsplit[1]
+			case DIRECTIVE_META_CAPTION: // = "caption"   //Caption for this metric, optional. Printable text without unit
+				result.Meta.Caption = eqsplit[1]
+			//case DIRECTIVE_META_THING: // =  "thing"       //What thing this measures  "ambient", "gas", "oil"...  "inlet","cell" etc.. for grouping
+			//	result.Meta.Thing = eqsplit[1]
+			case DIRECTIVE_META_ACCURACY: // = "accuracy" //Numerical value or string pointing to other field by name Plus minus value
+				result.Meta.Accuracy = eqsplit[1]
+			case DIRECTIVE_META_MAXINTERVAL:
+				var err error
+				result.Meta.MaxInterval, err = time.ParseDuration(eqsplit[1])
+				if err != nil {
+					return result, err
+				}
 			}
 		}
 	}
@@ -221,7 +260,6 @@ func parseDirectives(tag string, typename string) (DirectiveSettings, error) {
 	if result.Clamped && (result.InfPosDefined || result.InfNegDefined) {
 		return result, fmt.Errorf("clamped and infpos/infneg can not be defined at same time")
 	}
-
 	return result, nil
 }
 
@@ -251,6 +289,7 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 		InfNeg:        dir.InfNeg,
 
 		//Const: dir.Const,
+		Meta: dir.Meta,
 	}
 
 	if 0 < len(dir.Const) {
@@ -290,7 +329,7 @@ func createPiecewiseCodingFromStruct(name string, typename string, tag string) (
 	return result, nil
 }
 
-//GetPiecewisesFromStruct parses by reflect all datatypes with directives to PiecewiseFloats
+// GetPiecewisesFromStruct parses by reflect all datatypes with directives to PiecewiseFloats
 func GetPiecewisesFromStruct(v interface{}) (PiecewiseFloats, error) {
 	result := []PiecewiseCoding{}
 	t := reflect.TypeOf(v)
@@ -309,7 +348,7 @@ func GetPiecewisesFromStruct(v interface{}) (PiecewiseFloats, error) {
 	return result, nil
 }
 
-//setValuesFromFloatMap is helper function
+// setValuesFromFloatMap is helper function
 func (p *PiecewiseFloats) setValuesFromFloatMap(v interface{}, values map[string]float64) error {
 	elem := reflect.ValueOf(v).Elem()
 	for name, inputValue := range values {
@@ -460,7 +499,7 @@ func (p *PiecewiseFloats) GetValuesToFloatMap(v interface{}) (map[string]float64
 	return result, nil
 }
 
-//UnSplurts converts byte array to wanted target struct  (remember &output when call)
+// UnSplurts converts byte array to wanted target struct  (remember &output when call)
 func (p *PiecewiseFloats) UnSplurts(raw []byte, output interface{}) error {
 	errInv := p.IsInvalid()
 	if errInv != nil {
@@ -485,7 +524,7 @@ func (p *PiecewiseFloats) UnSplurts7bitBytes(raw SevenBitArr, output interface{}
 	return p.setValuesFromFloatMap(output, variableMap)
 }
 
-//Splurts data to bytes  Get piecewiseFloatStruct by calling GetPiecewisesFromStruct
+// Splurts data to bytes  Get piecewiseFloatStruct by calling GetPiecewisesFromStruct
 func (p *PiecewiseFloats) Splurts(input interface{}) ([]byte, error) {
 	m, e := p.GetValuesToFloatMap(input)
 	if e != nil {
@@ -522,7 +561,7 @@ func (p *PiecewiseFloats) Splurts7bitBytes(input interface{}) (SevenBitArr, erro
 	return p.Encode7bitBytes(m)
 }
 
-//ToStrings writes values with required number of decimals and enums in string format
+// ToStrings writes values with required number of decimals and enums in string format
 func (p *PiecewiseFloats) ToStrings(input interface{}, quotes bool) (map[string]string, error) {
 	result := make(map[string]string)
 	m, e := p.GetValuesToFloatMap(input)

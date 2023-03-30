@@ -25,13 +25,13 @@ type ParticleMeas struct {
 func TestSimple(t *testing.T) {
 
 	testArr := []ParticleMeas{
-		ParticleMeas{SystemStatus: "IDLE", Temperature: 22.1, Humidity: 32.4, Pressure: 95200, Small: 69.42, Large: 33, Extra: 2, Heater: false, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "MEASURE", Temperature: 22.2, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "MEASURE", Temperature: 22.3, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "MEASURE", Temperature: 22.4, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "MEASURE", Temperature: 22.5, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "MEASURE", Temperature: 22.6, Humidity: 32.6, Pressure: 95500, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
-		ParticleMeas{SystemStatus: "STOP", Temperature: 22.3, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: false, Emptyvalue: "YES"},
+		{SystemStatus: "IDLE", Temperature: 22.1, Humidity: 32.4, Pressure: 95200, Small: 69.42, Large: 33, Extra: 2, Heater: false, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.2, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.3, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.4, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.5, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "MEASURE", Temperature: 22.6, Humidity: 32.6, Pressure: 95500, Small: 67.11, Large: 34, Extra: 3, Heater: true, Emptyvalue: "YES"},
+		{SystemStatus: "STOP", Temperature: 22.3, Humidity: 32.6, Pressure: 95100, Small: 67.11, Large: 34, Extra: 3, Heater: false, Emptyvalue: "YES"},
 	}
 
 	//Lets round with splurts (assume that it is working ok)
@@ -47,18 +47,20 @@ func TestSimple(t *testing.T) {
 		assert.Equal(t, nil, unsplurtErr)
 	}
 
-	code, err := SplurtsArrToMessagepack(recipe, testArr)
+	mm, err := SplurtsArrToMetricArrMap(recipe, testArr)
 	assert.Equal(t, nil, err)
 
-	/*
-		fmt.Printf("CODE\n")
-		for _, v := range code {
-			fmt.Printf("%02X ", v)
-		}
-		fmt.Printf("\n")
-	*/
+	tabulated, errTabulate := mm.TabulateValues([]string{"ext", "Emptyvalue", "Temperature", "Small", "pres", "Large", "Heater", "stat", "hum"}, "\t")
+	assert.Equal(t, nil, errTabulate)
+	assert.Equal(t, "2.0\tYES\t22.1\t69.4\t95200.00\t33.0\t0\tIDLE\t32.40\n3.0\tYES\t22.2\t67.1\t95100.00\t34.0\t1\tMEASURE\t32.60\n3.0\tYES\t22.3\t67.1\t95100.00\t34.0\t1\tMEASURE\t32.60\n3.0\tYES\t22.4\t67.1\t95100.00\t34.0\t1	MEASURE\t32.60\n3.0\tYES\t22.5\t67.1\t95100.00\t34.0\t1	MEASURE\t32.60\n3.0\tYES\t22.6\t67.1\t95500.00\t34.0\t1	MEASURE\t32.60\n3.0\tYES\t22.3\t67.1\t95100.00\t34.0\t0	STOP\t32.60\n", tabulated)
 
-	metricsBack, backErr := ReadMsgPackMetrics(bytes.NewBuffer(code))
+	codebuf := new(bytes.Buffer)
+	err = mm.Write(codebuf)
+	assert.Equal(t, nil, err)
+
+	code := codebuf.Bytes()
+
+	metricsBack, backErr := ReadMetricsArrMap(bytes.NewBuffer(code))
 	assert.Equal(t, nil, backErr)
 	testmap, _ := recipe.GetValuesToFloatMapArr(testArr)
 
@@ -82,15 +84,10 @@ func TestSimple(t *testing.T) {
 		arrOutput, hazOutput := metricsBack[outputname]
 		assert.Equal(t, true, hazOutput)
 
-		//fmt.Printf("VARIABLE %s have %v deltas\n", outputname, arrOutput.Delta)
-
 		outVec, outVecErr := arrOutput.AllValues()
 		assert.Equal(t, nil, outVecErr)
 		assert.Equal(t, len(arrInput), len(outVec))
 		assert.Equal(t, fmt.Sprintf("%.4f", arrInput), fmt.Sprintf("%.4f", outVec))
-
-		//fmt.Printf("\n%s: %.2f  VERSUS %s: %.2f\n\n", inputname, arrInput, outputname, outVec)
-
 	}
 
 }

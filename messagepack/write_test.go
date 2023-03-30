@@ -6,7 +6,6 @@ import (
 )
 
 func TestWrites(t *testing.T) {
-
 	b := new(bytes.Buffer)
 	WriteFixmap(b, 6)
 
@@ -27,12 +26,4 @@ func TestWrites(t *testing.T) {
 
 	WriteString(b, "f") //6
 	WriteInt(b, 4000)
-
-	/*
-		fmt.Printf("TESTWRITE\n")
-		code := b.Bytes()
-		for _, v := range code {
-			fmt.Printf("%X ", v)
-		}
-		fmt.Printf("\n")*/
 }
