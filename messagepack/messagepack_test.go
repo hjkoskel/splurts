@@ -59,7 +59,6 @@ func TestSimple(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	code := codebuf.Bytes()
-
 	metricsBack, backErr := ReadMetricsArrMap(bytes.NewBuffer(code))
 	assert.Equal(t, nil, backErr)
 	testmap, _ := recipe.GetValuesToFloatMapArr(testArr)
@@ -67,14 +66,13 @@ func TestSimple(t *testing.T) {
 	testNameMapping := map[string]string{
 		"SystemStatus": "stat",
 		"Temperature":  "Temperature",
-		//"StaticSymbol": "StaticSymbol",
-		"Humidity":   "hum",
-		"Pressure":   "pres",
-		"Small":      "Small",
-		"Large":      "Large",
-		"Extra":      "ext",
-		"Heater":     "Heater",
-		"Emptyvalue": "Emptyvalue",
+		"Humidity":     "hum",
+		"Pressure":     "pres",
+		"Small":        "Small",
+		"Large":        "Large",
+		"Extra":        "ext",
+		"Heater":       "Heater",
+		"Emptyvalue":   "Emptyvalue",
 	}
 
 	for inputname, outputname := range testNameMapping {

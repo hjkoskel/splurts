@@ -60,17 +60,14 @@ func ReadDeltaRLEVec(buf io.Reader) (DeltaRLEVec, error) {
 			if is2 != 2 {
 				return nil, fmt.Errorf("rle data have array length of %v, only len 2 is allowed", is2)
 			}
-
 			wErr := WriteArray(result, 2)
 			if wErr != nil {
 				return nil, wErr
 			}
-
 			intval, errintval := ReadInt(buf)
 			if errintval != nil {
 				return nil, errintval
 			}
-
 			wErr = WriteInt(result, intval)
 			if wErr != nil {
 				return nil, wErr
@@ -117,14 +114,14 @@ func (p *DeltaRLEVec) ToArr(deltas int) ([]int64, error) {
 	return unpacked, nil
 }
 
-func (p *DeltaRLEVec) WriteToBuf(buf *bytes.Buffer) error {
+func (p *DeltaRLEVec) WriteToBuf(w io.Writer) error {
 	if *p == nil {
-		return WriteNil(buf)
+		return WriteNil(w)
 	}
 	if len(*p) == 0 {
-		return WriteNil(buf)
+		return WriteNil(w)
 	}
-	_, e := buf.Write(*p)
+	_, e := w.Write(*p)
 	return e
 }
 
@@ -155,20 +152,20 @@ func UnDeltaVec(v []int64) []int64 {
 	return result
 }
 
-func writeRLE(buf *bytes.Buffer, value int64, count int64, rleLimit int64) (int64, error) {
+func writeRLE(w io.Writer, value int64, count int64, rleLimit int64) (int64, error) {
 	if rleLimit <= count && 0 < rleLimit {
-		e := WriteArray(buf, 2)
+		e := WriteArray(w, 2)
 		if e != nil {
 			return 0, e
 		}
-		e = WriteInt(buf, value)
+		e = WriteInt(w, value)
 		if e != nil {
 			return 0, e
 		}
-		return 1, WriteInt(buf, count)
+		return 1, WriteInt(w, count)
 	}
 	for i := 0; i < int(count); i++ { //TODO uint32 int64 at writeInt
-		e := WriteInt(buf, value)
+		e := WriteInt(w, value)
 		if e != nil {
 			return 0, e
 		}
@@ -177,14 +174,14 @@ func writeRLE(buf *bytes.Buffer, value int64, count int64, rleLimit int64) (int6
 	return count, nil
 }
 
-func ArrToMessagepack(buf *bytes.Buffer, arr []int64) error {
-	e := WriteArray(buf, uint32(len(arr)))
+func ArrToMessagepack(w io.Writer, arr []int64) error {
+	e := WriteArray(w, uint32(len(arr)))
 	if e != nil {
 		return e
 	}
 
 	for _, value := range arr {
-		e := WriteInt(buf, value)
+		e := WriteInt(w, value)
 		if e != nil {
 			return e
 		}
@@ -192,14 +189,13 @@ func ArrToMessagepack(buf *bytes.Buffer, arr []int64) error {
 	return nil
 }
 
-func ArrToRLEMessagepack(buf *bytes.Buffer, arr []int64, rleLimit int64) error {
+func ArrToRLEMessagepack(w io.Writer, arr []int64, rleLimit int64) error {
 	if len(arr) == 0 {
 		return nil
 	}
 	workbuf := new(bytes.Buffer)
 
 	itemcount := int64(0)
-
 	repeatedCount := int64(0)
 	previous := arr[0]
 	for _, v := range arr {
@@ -222,20 +218,21 @@ func ArrToRLEMessagepack(buf *bytes.Buffer, arr []int64, rleLimit int64) error {
 	}
 	itemcount += itemsWritten
 
-	e = WriteArray(buf, uint32(itemcount))
+	e = WriteArray(w, uint32(itemcount))
 	if e != nil {
 		return e
 	}
-	_, e = buf.Write(workbuf.Bytes())
+	_, e = w.Write(workbuf.Bytes())
 	return e
 }
 
-func RLEMessagepackToArr(buf *bytes.Buffer) ([]int64, error) {
-	first, firstErr := buf.ReadByte()
+func RLEMessagepackToArr(r io.Reader) ([]int64, error) {
+	var first [1]byte
+	_, firstErr := r.Read(first[:])
 	if firstErr != nil {
 		return nil, firstErr
 	}
-	itemcount, errItemCount := ReadArrWithFirst(buf, first)
+	itemcount, errItemCount := ReadArrWithFirst(r, first[0])
 	if errItemCount != nil {
 		return nil, errItemCount
 	}
@@ -244,23 +241,23 @@ func RLEMessagepackToArr(buf *bytes.Buffer) ([]int64, error) {
 
 	//Only numbers and two item arrays
 	for itemcounter := uint32(0); itemcounter < itemcount; itemcounter++ {
-		first, firstErr := buf.ReadByte()
+		_, firstErr := r.Read(first[:])
 		if firstErr != nil {
 			return nil, firstErr
 		}
-		if IsArr(first) {
-			two, errTwo := ReadArrWithFirst(buf, first)
+		if IsArr(first[0]) {
+			two, errTwo := ReadArrWithFirst(r, first[0])
 			if errTwo != nil {
 				return nil, errTwo
 			}
 			if two != 2 {
 				return nil, fmt.Errorf("item %v array length is %v, not 2", itemcounter, two)
 			}
-			value, errValue := ReadInt(buf)
+			value, errValue := ReadInt(r)
 			if errValue != nil {
 				return nil, errValue
 			}
-			repeats, errRepeats := ReadInt(buf)
+			repeats, errRepeats := ReadInt(r)
 			if errRepeats != nil {
 				return nil, errRepeats
 			}
@@ -269,7 +266,7 @@ func RLEMessagepackToArr(buf *bytes.Buffer) ([]int64, error) {
 			}
 		} else {
 
-			value, valueErr := ReadIntWithFirst(buf, first)
+			value, valueErr := ReadIntWithFirst(r, first[0])
 			if valueErr != nil {
 				return nil, valueErr
 			}

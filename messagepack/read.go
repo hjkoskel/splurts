@@ -1,16 +1,5 @@
 /*
 Raw messagepack functions
-
-# Just minimal
-
-For starting map and array:
-func WriteFixmap(buf *bytes.Buffer, n int) error {
-func WriteArray(buf *bytes.Buffer, n int) error {
-
-For adding variables (intelligent way)
-func WriteString(buf *bytes.Buffer, s string) error {
-func WriteBool(buf *bytes.Buffer, value bool) error {
-func WriteNumber(buf *bytes.Buffer, f float64, maxErr float64) error {
 */
 package messagepack
 
@@ -246,7 +235,6 @@ func ReadIntWithFirst(buf io.Reader, first byte) (int64, error) {
 	if first&0x80 == 0 { //pos integer 8bit
 		return int64(first), nil
 	}
-
 	if first&0xE0 == 0xE0 {
 		return int64(int8(first)), nil
 	}

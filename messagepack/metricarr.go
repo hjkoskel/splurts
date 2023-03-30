@@ -1,7 +1,6 @@
 package messagepack
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"math"
@@ -19,55 +18,78 @@ type MetricArr struct { //One entry from splurts struct
 	Data  DeltaRLEVec //TODO WITHOUT COUNT HOW MANY POINTS
 }
 
-func (p *MetricArr) Write(buf *bytes.Buffer) error {
-	WriteFixmap(buf, 4)
-	err := WriteString(buf, MPNAME_META) //1
-	if err != nil {
-		return err
+func (p *MetricArr) Write(w io.Writer) error {
+	e := WriteFixmap(w, 4)
+	if e != nil {
+		return e
 	}
-	err = p.Meta.Write(buf)
-	if err != nil {
-		return err
+	e = WriteString(w, MPNAME_META) //1
+	if e != nil {
+		return e
+	}
+	e = p.Meta.Write(w)
+	if e != nil {
+		return e
 	}
 
-	err = WriteString(buf, MPNAME_CODING) //2
-	if err != nil {
-		return err
+	e = WriteString(w, MPNAME_CODING) //2
+	if e != nil {
+		return e
 	}
-	p.Coding.Write(buf)
+	e = p.Coding.Write(w)
+	if e != nil {
+		return e
+	}
 
 	if 0 < len(p.Enums) { //3
-		err = WriteString(buf, MPNAME_ENUMS)
-		if err != nil {
-			return err
+		e = WriteString(w, MPNAME_ENUMS)
+		if e != nil {
+			return e
 		}
-		WriteArray(buf, uint32(len(p.Enums)))
+		e = WriteArray(w, uint32(len(p.Enums)))
+		if e != nil {
+			return e
+		}
 		for _, s := range p.Enums {
-			WriteString(buf, s)
+			e = WriteString(w, s)
+			if e != nil {
+				return e
+			}
 		}
 	} else {
-		WriteString(buf, MPNAME_STEPS)
+		e = WriteString(w, MPNAME_STEPS)
+		if e != nil {
+			return e
+		}
 		if len(p.Steps) == 0 {
 			return fmt.Errorf("no steps defined")
 		}
-		WriteArray(buf, uint32(len(p.Steps)))
+		e = WriteArray(w, uint32(len(p.Steps)))
+		if e != nil {
+			return e
+		}
 		for _, step := range p.Steps {
-			step.Write(buf)
+			e = step.Write(w)
+			if e != nil {
+				return e
+			}
 		}
 	}
 
 	switch p.Delta { //4
 	case 0:
-		WriteString(buf, MPCODING_SIMPLEARR)
+		e = WriteString(w, MPCODING_SIMPLEARR)
 	case 1:
-		WriteString(buf, MPCODING_DELTA1ARR)
+		e = WriteString(w, MPCODING_DELTA1ARR)
 	case 2:
-		WriteString(buf, MPCODING_DELTA2ARR)
+		e = WriteString(w, MPCODING_DELTA2ARR)
 	default:
 		return fmt.Errorf("delta %v not supported", p.Delta)
 	}
-	p.Data.WriteToBuf(buf)
-	return nil
+	if e != nil {
+		return e
+	}
+	return p.Data.WriteToBuf(w)
 }
 
 func ReadMetricArr(buf io.Reader) (MetricArr, error) {
@@ -242,7 +264,6 @@ func (p *MetricArr) AllValuesAsString() ([]string, error) {
 		}
 		return result, nil
 	}
-
 	for i, reg := range regarr {
 		f, step, err := p.ValueAndStep(reg) //TODO more optimized...this is for initial testing
 		if err != nil {

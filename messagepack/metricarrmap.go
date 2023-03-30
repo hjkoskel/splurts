@@ -6,7 +6,6 @@ Metricarrmap is created from struct or array of splurts structs
 package messagepack
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -94,18 +93,18 @@ func ReadMetricsArrMap(buf io.Reader) (MetricArrMap, error) {
 	return result, nil
 }
 
-func (p *MetricArrMap) Write(buf *bytes.Buffer) error {
-	err := WriteFixmap(buf, uint32(len(*p)))
+func (p *MetricArrMap) Write(w io.Writer) error {
+	err := WriteFixmap(w, uint32(len(*p)))
 	if err != nil {
 		return err
 	}
 	for metname, met := range *p {
-		err = WriteString(buf, metname)
+		err = WriteString(w, metname)
 		if err != nil {
 			return err
 		}
 
-		err = met.Write(buf)
+		err = met.Write(w)
 		if err != nil {
 			return err
 		}
@@ -163,12 +162,10 @@ func SplurtsArrToMetricArrMap(pw splurts.PiecewiseFloats, input interface{}) (Me
 			Enums:  p.Enums,
 			Coding: MetricCoding{Min: p.Min, Max: p.Max(), Clamped: p.Clamped},
 			Steps:  entrySteps,
-
-			Delta: int(packdirect.Delta),
+			Delta:  int(packdirect.Delta),
 		}
 
 		var dataConvErr error
-
 		//TODO int64 register values required!
 		entry.Data, dataConvErr = CreateDeltaRLEVec(p.ScaleToIntArr(arr), entry.Delta, int(packdirect.Rle))
 		if dataConvErr != nil {

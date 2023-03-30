@@ -8,7 +8,6 @@ import (
 )
 
 func TestMetricArr(t *testing.T) {
-
 	vec, errVec := CreateDeltaRLEVec([]int64{1, 2, 3, 4, 5, 6, 100, 102, 105, 110, 120, 130, 140, 140, 140, 140}, 2, 2)
 	assert.Equal(t, nil, errVec)
 

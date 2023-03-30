@@ -1,7 +1,6 @@
 package messagepack
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 )
@@ -39,33 +38,33 @@ func ReadMetricCoding(buf io.Reader) (MetricCoding, error) {
 	return result, nil
 }
 
-func (p *MetricCoding) Write(buf *bytes.Buffer) error {
-	err := WriteFixmap(buf, 3)
+func (p *MetricCoding) Write(w io.Writer) error {
+	err := WriteFixmap(w, 3)
 	if err != nil {
 		return err
 	}
 
-	err = WriteString(buf, MPNAME_CODING_MIN)
+	err = WriteString(w, MPNAME_CODING_MIN)
 	if err != nil {
 		return err
 	}
-	err = writeFloat64(buf, p.Min)
+	err = writeFloat64(w, p.Min)
 	if err != nil {
 		return err
 	}
-	err = WriteString(buf, MPNAME_CODING_MAX)
+	err = WriteString(w, MPNAME_CODING_MAX)
 	if err != nil {
 		return err
 	}
-	err = writeFloat64(buf, p.Max)
+	err = writeFloat64(w, p.Max)
 	if err != nil {
 		return err
 	}
-	err = WriteString(buf, MPNAME_CODING_CLAMPED)
+	err = WriteString(w, MPNAME_CODING_CLAMPED)
 	if err != nil {
 		return err
 	}
-	return WriteBool(buf, p.Clamped)
+	return WriteBool(w, p.Clamped)
 }
 
 type MetricStep struct {
@@ -98,24 +97,24 @@ func ReadMetricStep(buf io.Reader) (MetricStep, error) {
 	return result, nil
 }
 
-func (p *MetricStep) Write(buf *bytes.Buffer) error {
-	err := WriteFixmap(buf, 2)
+func (p *MetricStep) Write(w io.Writer) error {
+	err := WriteFixmap(w, 2)
 	if err != nil {
 		return err
 	}
-	err = WriteString(buf, MPNAME_POINTCOUNT)
+	err = WriteString(w, MPNAME_POINTCOUNT)
 	if err != nil {
 		return err
 	}
-	err = WriteInt(buf, p.Count)
+	err = WriteInt(w, p.Count)
 	if err != nil {
 		return err
 	}
-	err = WriteString(buf, MPNAME_STEPSIZE)
+	err = WriteString(w, MPNAME_STEPSIZE)
 	if err != nil {
 		return err
 	}
-	return writeFloat64(buf, p.Step)
+	return writeFloat64(w, p.Step)
 }
 
 // Same as in splurts.. But trying to make this lib not depending on splurts
@@ -159,13 +158,13 @@ func ReadMetricMeta(buf io.Reader) (MetricMeta, error) {
 	return result, nil
 }
 
-func (p *MetricMeta) Write(buf *bytes.Buffer) error {
-	err := WriteFixmap(buf, 5)
+func (p *MetricMeta) Write(w io.Writer) error {
+	err := WriteFixmap(w, 5)
 	if err != nil {
 		return err
 	}
 
-	err = WriteStringMapString(buf, map[string]string{
+	err = WriteStringMapString(w, map[string]string{
 		MPNAME_META_UNIT:     p.Unit,
 		MPNAME_META_CAPTION:  p.Caption,
 		MPNAME_META_ACCURACY: p.Accuracy,
@@ -174,20 +173,19 @@ func (p *MetricMeta) Write(buf *bytes.Buffer) error {
 		return err
 	}
 
-	err = WriteString(buf, MPNAME_META_MAXINTERVAL)
+	err = WriteString(w, MPNAME_META_MAXINTERVAL)
 	if err != nil {
 		return err
 	}
-	err = writeUInt(buf, uint64(p.MaxInterval))
+	err = writeUInt(w, uint64(p.MaxInterval))
 	if err != nil {
 		return err
 	}
-
-	err = WriteString(buf, MPNAME_META_BANDWIDTH)
+	err = WriteString(w, MPNAME_META_BANDWIDTH)
 	if err != nil {
 		return err
 	}
-	err = writeFloat64(buf, p.Bandwidth)
+	err = writeFloat64(w, p.Bandwidth)
 	if err != nil {
 		return err
 	}

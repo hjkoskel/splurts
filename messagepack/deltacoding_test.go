@@ -55,11 +55,8 @@ func TestDeltaUndelta(t *testing.T) {
 	inputdata := []int64{6, 2, 2, 4, 1, 4, 4, 4}
 	delted := DeltaVec(inputdata)
 	outputdata := UnDeltaVec(delted)
-
 	assert.Equal(t, inputdata, outputdata)
-
 	assert.Equal(t, inputdata, UnDeltaVec(UnDeltaVec(DeltaVec(DeltaVec(inputdata)))))
-
 }
 
 func TestOneDelta(t *testing.T) {
@@ -74,7 +71,6 @@ func TestOneDelta(t *testing.T) {
 
 	unpacked, unpackerr := RLEMessagepackToArr(codebuf)
 	assert.Equal(t, nil, unpackerr)
-
 	assert.Equal(t, inputdata, unpacked)
 }
 
@@ -91,5 +87,4 @@ func TestRLE(t *testing.T) {
 	assert.Equal(t, nil, unpackerr)
 
 	assert.Equal(t, inputdata, unpacked)
-
 }

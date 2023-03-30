@@ -69,7 +69,6 @@ func splitTags(s string) map[string]string {
 	arr := strings.Split(s, ",")
 
 	result := make(map[string]string)
-
 	for _, a := range arr {
 		nameVal := strings.Split(a, "=")
 		if len(nameVal) == 1 {

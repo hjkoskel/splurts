@@ -46,5 +46,4 @@ func TestMetricMeta(t *testing.T) {
 	ref, refErr := ReadMetricMeta(bytes.NewBuffer(code))
 	assert.Equal(t, nil, refErr)
 	assert.Equal(t, dut, ref)
-
 }

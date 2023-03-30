@@ -67,7 +67,6 @@ func TestIntReads(t *testing.T) {
 }
 
 func TestStringReadWrites(t *testing.T) {
-
 	testStrings := []string{
 		"a",
 		"abc",
